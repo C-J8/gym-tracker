@@ -1,0 +1,496 @@
+﻿data,grupo_muscular,exercicio,tipo,peso_kg,serie,repeticoes
+2025-10-22,Pernas,Extensora,Maquina,50,1,8
+2025-10-22,Pernas,Extensora,Maquina,50,2,8
+2025-10-22,Pernas,Flexora,Maquina,30,1,12
+2025-10-22,Pernas,Flexora,Maquina,30,2,12
+2025-10-22,Pernas,Abdutora,Maquina,70,1,12
+2025-10-22,Pernas,Abdutora,Maquina,70,2,12
+2025-10-22,Pernas,Adutora,Maquina,70,1,10
+2025-10-22,Pernas,Adutora,Maquina,70,2,10
+2025-10-22,Abdomen,Abdominal,Maquina,18,1,12
+2025-10-22,Abdomen,Abdominal,Maquina,22,2,8
+2025-10-23,Peito,Supino inclinado,Maquina com anilha,30,1,12
+2025-10-23,Peito,Supino inclinado,Maquina com anilha,35,2,7
+2025-10-23,Costas,Puxada alta,Maquina,45,1,11
+2025-10-23,Costas,Puxada alta,Maquina,45,2,7
+2025-10-23,Costas,Serrote,Maquina,40,1,10
+2025-10-23,Peito,Supino reto,Halter,24,1,10
+2025-10-23,Peito,Supino reto,Halter,26,2,6
+2025-10-23,Peito,Crucifixo,Maquina com anilha,35,1,7
+2025-10-23,Peito,Crucifixo,Maquina com anilha,35,2,6
+2025-10-23,Triceps,Triceps,Cabo,20,1,10
+2025-10-23,Triceps,Triceps,Cabo,22,2,10
+2025-10-23,Triceps,Triceps unilateral,Cabo,5,1,12
+2025-10-23,Triceps,Triceps unilateral,Cabo,7.5,2,6
+2025-10-23,Biceps,Biceps zottman,Halter,10,1,10
+2025-10-23,Biceps,Biceps zottman,Halter,10,2,6
+2025-10-23,Biceps,Biceps,Maquina,10,1,10
+2025-10-23,Biceps,Biceps,Maquina,12.5,2,7
+2025-10-24,Pernas,Extensora,Maquina,50,1,10
+2025-10-24,Pernas,Extensora,Maquina,50,2,10
+2025-10-24,Pernas,Flexora,Maquina,30,1,12
+2025-10-24,Pernas,Flexora,Maquina,35,2,6
+2025-10-24,Pernas,Adutora,Maquina,60,1,10
+2025-10-24,Pernas,Adutora,Maquina,60,2,7
+2025-10-24,Pernas,Abdutora,Maquina,60,1,10
+2025-10-24,Pernas,Abdutora,Maquina,70,2,10
+2025-10-24,Abdomen,Abdominal,Maquina,20,1,10
+2025-10-24,Abdomen,Abdominal,Maquina,25,2,8
+2025-12-30,Peito,Supino inclinado,Maquina com anilha,20,1,10
+2025-12-30,Peito,Supino inclinado,Maquina com anilha,30,2,6
+2025-12-30,Peito,Supino reto,Maquina,50,1,10
+2025-12-30,Peito,Supino reto,Maquina,60,2,4
+2025-12-30,Peito,Supino inclinado,Maquina com anilha,20,1,10
+2025-12-30,Peito,Supino inclinado,Maquina com anilha,30,2,6
+2025-12-30,Peito,Supino reto,Maquina,50,1,10
+2025-12-30,Peito,Supino reto,Maquina,60,2,4
+2025-12-30,Peito,Crucifixo,Maquina com anilha,15,1,10
+2025-12-30,Peito,Crucifixo,Maquina com anilha,15,2,10
+2025-12-30,Costas,Puxada alta,Maquina,40,1,10
+2025-12-30,Costas,Puxada alta,Maquina,40,2,4
+2025-12-30,Costas,Puxada baixa,Maquina,25,1,10
+2025-12-30,Costas,Puxada baixa,Maquina,30,2,8
+2026-01-05,Peito,Supino reto,Maquina,50,1,10
+2026-01-05,Peito,Supino reto,Maquina,60,2,5
+2026-01-05,Peito,Supino inclinado,Halter,20,1,6
+2026-01-05,Peito,Supino inclinado,Halter,20,2,6
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,1,7
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,2,14
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,3,10
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,4,14
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,5,6
+2026-01-05,Costas,Puxada baixa,Maquina,25,1,10
+2026-01-05,Costas,Puxada baixa,Maquina,30,2,6
+2026-01-05,Peito,Supino reto,Maquina,50,1,10
+2026-01-05,Peito,Supino reto,Maquina,60,2,5
+2026-01-05,Peito,Supino inclinado,Halter,20,1,6
+2026-01-05,Peito,Supino inclinado,Halter,20,2,6
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,1,7
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,2,14
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,3,10
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,4,14
+2026-01-05,Peito,Crucifixo,Maquina com anilha,15,5,6
+2026-01-05,Costas,Puxada baixa,Maquina,25,1,10
+2026-01-05,Costas,Puxada baixa,Maquina,30,2,6
+2026-01-05,Costas,Puxada lateral,Maquina,15,1,8
+2026-01-05,Costas,Puxada lateral,Maquina,15,2,8
+2026-01-08,Pernas,Extensora,Maquina,40,1,10
+2026-01-08,Pernas,Extensora,Maquina,50,2,4
+2026-01-08,Pernas,Flexora,Maquina,30,1,10
+2026-01-08,Pernas,Flexora,Maquina,35,2,6
+2026-01-08,Pernas,Abdutora,Maquina,60,1,10
+2026-01-08,Pernas,Abdutora,Maquina,70,2,7
+2026-01-08,Pernas,Adutora,Maquina,50,1,10
+2026-01-08,Pernas,Adutora,Maquina,60,2,6
+2026-01-08,Ombro,Desenvolvimento,Maquina,30,1,7
+2026-01-08,Ombro,Desenvolvimento,Maquina,30,2,10
+2026-01-08,Triceps,Triceps,Cabo,20,1,7
+2026-01-08,Triceps,Triceps,Cabo,20,2,10
+2026-01-08,Triceps,Triceps unilateral,Cabo,5,1,7
+2026-01-08,Antebraco,Antebraco dentro,Maquina,5,1,10
+2026-01-08,Antebraco,Antebraco dentro,Maquina,7.5,2,10
+2026-01-13,Peito,Supino reto,Maquina,50,1,10
+2026-01-13,Peito,Supino reto,Maquina,60,2,6
+2026-01-13,Peito,Supino inclinado,Halter,20,1,7
+2026-01-13,Peito,Supino inclinado,Halter,20,2,6
+2026-01-13,Peito,Crucifixo,Maquina com anilha,15,1,6
+2026-01-13,Peito,Crucifixo,Maquina com anilha,15,2,5
+2026-01-13,Peito,Crucifixo,Maquina com anilha,15,3,14
+2026-01-13,Peito,Crucifixo,Maquina com anilha,15,4,10
+2026-01-13,Peito,Crucifixo,Maquina com anilha,15,5,7
+2026-01-13,Peito,Crucifixo,Maquina com anilha,15,6,5
+2026-01-13,Costas,Puxada baixa,Maquina,25,1,10
+2026-01-13,Costas,Puxada baixa,Maquina,30,2,8
+2026-01-13,Costas,Puxada lateral,Maquina,15,1,10
+2026-01-13,Costas,Puxada lateral,Maquina,15,2,10
+2026-01-14,Pernas,Extensora,Maquina,40,1,10
+2026-01-14,Pernas,Extensora,Maquina,50,2,7
+2026-01-14,Pernas,Flexora,Maquina,30,1,10
+2026-01-14,Pernas,Flexora,Maquina,35,2,5
+2026-01-14,Pernas,Abdutora,Maquina,60,1,10
+2026-01-14,Pernas,Abdutora,Maquina,70,2,7
+2026-01-14,Pernas,Adutora,Maquina,50,1,10
+2026-01-14,Pernas,Adutora,Maquina,60,2,6
+2026-01-14,Ombro,Desenvolvimento,Maquina,30,1,10
+2026-01-14,Ombro,Desenvolvimento,Maquina,40,2,5
+2026-01-14,Biceps,Biceps zottman,Halter,9,1,8
+2026-01-14,Biceps,Biceps zottman,Halter,9,2,10
+2026-01-14,Biceps,Biceps,Maquina,15,1,10
+2026-01-14,Biceps,Biceps,Maquina,15,2,7
+2026-01-14,Abdomen,Abdominal,Maquina,20,1,10
+2026-01-14,Abdomen,Abdominal,Maquina,25,2,4
+2026-01-17,Peito,Supino reto,Maquina,50,1,10
+2026-01-17,Peito,Supino reto,Maquina,60,2,7
+2026-01-17,Peito,Supino inclinado,Maquina com anilha,30,1,9
+2026-01-17,Peito,Supino inclinado,Maquina com anilha,30,2,5
+2026-01-17,Peito,Crucifixo,Maquina com anilha,15,1,6
+2026-01-17,Peito,Crucifixo,Maquina com anilha,15,2,8
+2026-01-17,Peito,Crucifixo,Maquina com anilha,15,3,14
+2026-01-17,Peito,Crucifixo,Maquina com anilha,15,4,12
+2026-01-17,Peito,Crucifixo,Maquina com anilha,15,5,7
+2026-01-17,Peito,Crucifixo,Maquina com anilha,15,6,5
+2026-01-17,Costas,Puxada baixa,Maquina,30,1,10
+2026-01-17,Costas,Puxada baixa,Maquina,35,2,5
+2026-01-17,Costas,Puxada lateral,Maquina,17.5,1,7
+2026-01-17,Costas,Puxada lateral,Maquina,17.5,2,8
+2026-01-17,Costas,Puxada lateral,Maquina,17.5,3,3
+2026-01-17,Costas,Puxada lateral,Maquina,17.5,4,6
+2026-01-21,Peito,Supino reto,Maquina,50,1,6
+2026-01-21,Peito,Supino reto,Maquina,60,2,5
+2026-01-21,Peito,Supino inclinado,Maquina com anilha,30,1,9
+2026-01-21,Peito,Supino inclinado,Maquina com anilha,30,2,6
+2026-01-21,Peito,Crucifixo,Maquina com anilha,15,1,6
+2026-01-21,Peito,Crucifixo,Maquina com anilha,15,2,10
+2026-01-21,Peito,Crucifixo,Maquina com anilha,15,3,10
+2026-01-21,Peito,Crucifixo,Maquina com anilha,15,4,3
+2026-01-21,Costas,Puxada baixa,Maquina,30,1,10
+2026-01-21,Costas,Puxada baixa,Maquina,35,2,5
+2026-01-23,Pernas,Extensora,Maquina,40,1,10
+2026-01-23,Pernas,Extensora,Maquina,50,2,7
+2026-01-23,Pernas,Flexora,Maquina,30,1,10
+2026-01-23,Pernas,Flexora,Maquina,35,2,5
+2026-01-23,Pernas,Abdutora,Maquina,60,1,10
+2026-01-23,Pernas,Abdutora,Maquina,70,2,9
+2026-01-23,Pernas,Adutora,Maquina,50,1,10
+2026-01-23,Pernas,Adutora,Maquina,60,2,7
+2026-01-23,Ombro,Desenvolvimento,Maquina,30,1,10
+2026-01-23,Ombro,Desenvolvimento,Maquina,35,2,10
+2026-01-23,Ombro,Lateral,Maquina,2.5,1,10
+2026-01-23,Ombro,Lateral,Maquina,3.75,2,10
+2026-01-23,Biceps,Biceps zottman,Halter,9,1,8
+2026-01-23,Biceps,Biceps zottman,Halter,9,2,10
+2026-01-23,Antebraco,Biceps antebraco,Maquina,10,1,10
+2026-01-23,Antebraco,Biceps antebraco,Maquina,12.5,2,5
+2026-01-23,Abdomen,Abdominal,Maquina,20,1,10
+2026-01-23,Abdomen,Abdominal,Maquina,25,2,4
+2026-01-30,Peito,Supino reto,Maquina,50,1,12
+2026-01-30,Peito,Supino reto,Maquina,60,2,6
+2026-01-30,Peito,Supino inclinado,Maquina com anilha,20,1,12
+2026-01-30,Peito,Supino inclinado,Maquina com anilha,30,2,8
+2026-01-30,Peito,Crucifixo,Maquina com anilha,15,1,5
+2026-01-30,Peito,Crucifixo,Maquina com anilha,15,2,8
+2026-01-30,Peito,Crucifixo,Maquina com anilha,15,3,14
+2026-01-30,Peito,Crucifixo,Maquina com anilha,15,4,12
+2026-01-30,Peito,Crucifixo,Maquina com anilha,15,5,7
+2026-01-30,Peito,Crucifixo,Maquina com anilha,15,6,6
+2026-01-30,Costas,Puxada baixa,Maquina,25,1,7
+2026-01-30,Costas,Puxada baixa,Maquina,30,2,6
+2026-01-30,Costas,Puxada lateral,Maquina,17.5,1,8
+2026-01-30,Costas,Puxada lateral,Maquina,17.5,2,7
+2026-01-30,Costas,Puxada lateral,Maquina,17.5,3,3
+2026-01-30,Costas,Puxada lateral,Maquina,17.5,4,10
+2026-01-30,Triceps,Triceps,Maquina,20,1,10
+2026-01-30,Triceps,Triceps,Maquina,22.5,2,6
+2026-02-20,Peito,Supino reto,Maquina,50,1,12
+2026-02-20,Peito,Supino reto,Maquina,60,2,6
+2026-02-20,Peito,Supino inclinado,Maquina com anilha,20,1,12
+2026-02-20,Peito,Supino inclinado,Maquina com anilha,30,2,8
+2026-02-20,Peito,Crucifixo,Maquina com anilha,15,1,5
+2026-02-20,Peito,Crucifixo,Maquina com anilha,15,2,8
+2026-02-20,Peito,Crucifixo,Maquina com anilha,15,3,14
+2026-02-20,Peito,Crucifixo,Maquina com anilha,15,4,12
+2026-02-20,Peito,Crucifixo,Maquina com anilha,15,5,7
+2026-02-20,Peito,Crucifixo,Maquina com anilha,15,6,8
+2026-02-20,Costas,Puxada baixa,Maquina,25,1,10
+2026-02-20,Costas,Puxada baixa,Maquina,30,2,8
+2026-02-20,Costas,Puxada lateral,Maquina,17.5,1,6
+2026-02-20,Costas,Puxada lateral,Maquina,20,2,5
+2026-02-20,Triceps,Triceps,Maquina,20,1,10
+2026-02-20,Triceps,Triceps,Maquina,22.5,2,4
+2026-02-27,Peito,Supino reto,Maquina,50,1,10
+2026-02-27,Peito,Supino reto,Maquina,60,2,6
+2026-02-27,Peito,Supino inclinado,Maquina com anilha,30,1,6
+2026-02-27,Peito,Supino inclinado,Maquina com anilha,30,2,5
+2026-02-27,Peito,Crucifixo,Maquina com anilha,15,1,5
+2026-02-27,Peito,Crucifixo,Maquina com anilha,15,2,8
+2026-02-27,Peito,Crucifixo,Maquina com anilha,15,3,10
+2026-02-27,Peito,Crucifixo,Maquina com anilha,15,4,6
+2026-02-27,Costas,Puxada baixa,Maquina,25,1,10
+2026-02-27,Costas,Puxada baixa,Maquina,30,2,10
+2026-02-27,Costas,Puxada lateral,Maquina,17.5,1,6
+2026-02-27,Costas,Puxada lateral,Maquina,20,2,5
+2026-02-27,Ombro,Lateral,Maquina,3.75,1,10
+2026-02-27,Ombro,Lateral,Maquina,3.75,2,10
+2026-02-27,Triceps,Triceps,Maquina,20,1,10
+2026-02-27,Triceps,Triceps,Maquina,22.5,2,4
+2026-02-27,Abdomen,Abdominal,Maquina,20,1,8
+2026-02-27,Abdomen,Abdominal,Maquina,25,2,7
+2026-03-02,Peito,Supino reto,Maquina,50,1,10
+2026-03-02,Peito,Supino reto,Maquina,60,2,4
+2026-03-02,Peito,Supino inclinado,Maquina com anilha,30,1,9
+2026-03-02,Peito,Supino inclinado,Maquina com anilha,30,2,6
+2026-03-02,Peito,Crucifixo,Maquina com anilha,15,1,5
+2026-03-02,Peito,Crucifixo,Maquina com anilha,15,2,8
+2026-03-02,Peito,Crucifixo,Maquina com anilha,15,3,14
+2026-03-02,Peito,Crucifixo,Maquina com anilha,15,4,10
+2026-03-02,Peito,Crucifixo,Maquina com anilha,15,5,7
+2026-03-02,Peito,Crucifixo,Maquina com anilha,15,6,7
+2026-03-02,Costas,Puxada baixa,Maquina,35,1,10
+2026-03-02,Costas,Puxada baixa,Maquina,35,2,10
+2026-03-02,Costas,Puxada lateral,Maquina,17.5,1,9
+2026-03-02,Costas,Puxada lateral,Maquina,20,2,5
+2026-03-02,Ombro,Lateral,Maquina,3.75,1,10
+2026-03-02,Ombro,Lateral,Maquina,3.75,2,10
+2026-03-02,Triceps,Triceps,Maquina,20,1,10
+2026-03-02,Triceps,Triceps,Maquina,22.5,2,4
+2026-03-06,Peito,Supino reto,Maquina,50,1,8
+2026-03-06,Peito,Supino reto,Maquina,50,2,7
+2026-03-06,Peito,Supino inclinado,Maquina com anilha,20,1,10
+2026-03-06,Peito,Supino inclinado,Maquina com anilha,30,2,8
+2026-03-06,Peito,Crucifixo,Maquina com anilha,10,1,9
+2026-03-06,Peito,Crucifixo,Maquina com anilha,10,2,10
+2026-03-06,Costas,Puxada alta,Maquina,30,1,10
+2026-03-06,Costas,Puxada alta,Maquina,40,2,6
+2026-03-06,Costas,Puxada baixa,Maquina,35,1,8
+2026-03-06,Costas,Puxada baixa,Maquina,35,2,5
+2026-03-06,Costas,Puxada lateral,Maquina,17.5,1,9
+2026-03-06,Costas,Puxada lateral,Maquina,20,2,5
+2026-03-06,Ombro,Lateral,Maquina,3.75,1,10
+2026-03-06,Ombro,Lateral,Maquina,3.75,2,12
+2026-03-06,Triceps,Triceps,Maquina,20,1,10
+2026-03-06,Triceps,Triceps,Maquina,22.5,2,5
+2026-03-18,Peito,Supino reto,Halter,20,1,10
+2026-03-18,Peito,Supino reto,Halter,20,2,7
+2026-03-18,Peito,Supino inclinado,Halter,20,1,7
+2026-03-18,Peito,Supino inclinado,Halter,20,2,8
+2026-03-18,Peito,Crucifixo,Maquina com anilha,10,1,9
+2026-03-18,Peito,Crucifixo,Maquina com anilha,10,2,10
+2026-03-18,Costas,Puxada alta,Maquina,40,1,10
+2026-03-18,Costas,Puxada alta,Maquina,40,2,9
+2026-03-18,Costas,Puxada baixa,Maquina,30,1,8
+2026-03-18,Costas,Puxada baixa,Maquina,35,2,5
+2026-03-18,Costas,Puxada lateral,Maquina,17.5,1,9
+2026-03-18,Costas,Puxada lateral,Maquina,20,2,5
+2026-03-18,Ombro,Lateral,Maquina,3.75,1,10
+2026-03-18,Ombro,Lateral,Maquina,3.75,2,12
+2026-03-18,Triceps,Triceps,Maquina,20,1,10
+2026-03-18,Triceps,Triceps,Maquina,22.5,2,5
+2026-03-18,Pernas,Extensora,Maquina,30,1,10
+2026-03-18,Pernas,Extensora,Maquina,40,2,10
+2026-03-18,Pernas,Flexora,Maquina,25,1,10
+2026-03-18,Pernas,Flexora,Maquina,30,2,5
+2026-03-18,Pernas,Abdutora,Maquina,50,1,10
+2026-03-18,Pernas,Abdutora,Maquina,60,2,10
+2026-03-18,Pernas,Adutora,Maquina,40,1,10
+2026-03-18,Pernas,Adutora,Maquina,50,2,10
+2026-03-18,Ombro,Desenvolvimento,Maquina,30,1,10
+2026-03-18,Ombro,Desenvolvimento,Maquina,35,2,10
+2026-03-18,Ombro,Lateral,Maquina,2.5,1,10
+2026-03-18,Ombro,Lateral,Maquina,3.75,2,10
+2026-03-18,Biceps,Biceps hack,Halter,12.5,1,10
+2026-03-18,Biceps,Biceps hack,Halter,15,2,9
+2026-03-18,Antebraco,Biceps antebraco,Maquina,2.75,1,10
+2026-03-18,Antebraco,Biceps antebraco,Maquina,2.75,2,10
+2026-03-18,Abdomen,Abdominal,Maquina,20,1,10
+2026-03-18,Abdomen,Abdominal,Maquina,25,2,4
+2026-03-26,Peito,Supino inclinado,Maquina com anilha,20.5,1,10
+2026-03-26,Peito,Supino inclinado,Maquina com anilha,30,2,7
+2026-03-26,Peito,Supino reto,Maquina,50,1,10
+2026-03-26,Peito,Supino reto,Maquina,60,2,6
+2026-03-26,Peito,Crucifixo,Maquina com anilha,20,1,10
+2026-03-26,Peito,Crucifixo,Maquina com anilha,20,2,8
+2026-03-26,Costas,Puxada alta,Maquina,30,1,10
+2026-03-26,Costas,Puxada alta,Maquina,30,2,5
+2026-03-26,Costas,Puxada baixa,Maquina,30,1,8
+2026-03-26,Costas,Puxada baixa,Maquina,35,2,5
+2026-03-26,Costas,Puxada lateral,Maquina,17.5,1,9
+2026-03-26,Costas,Puxada lateral,Maquina,20,2,5
+2026-03-26,Ombro,Lateral,Maquina,3.75,1,7
+2026-03-26,Ombro,Lateral,Maquina,3.75,2,7
+2026-03-26,Triceps,Triceps,Maquina,20,1,10
+2026-03-26,Triceps,Triceps,Maquina,22.5,2,5
+2026-04-01,Peito,Supino reto,Halter,20,1,8
+2026-04-01,Peito,Supino reto,Halter,20,2,8
+2026-04-01,Peito,Supino inclinado,Halter,18,1,10
+2026-04-01,Peito,Supino inclinado,Halter,20,2,4
+2026-04-01,Peito,Crucifixo,Maquina,52,1,8
+2026-04-01,Peito,Crucifixo,Maquina,52,2,6
+2026-04-01,Costas,Puxada alta,Maquina,45,1,10
+2026-04-01,Costas,Puxada alta,Maquina,40,2,9
+2026-04-01,Costas,Puxada baixa,Maquina,30,1,8
+2026-04-01,Costas,Puxada baixa,Maquina,35,2,5
+2026-04-01,Costas,Puxada lateral,Maquina,29,1,10
+2026-04-01,Costas,Puxada lateral,Maquina,29,2,10
+2026-04-01,Ombro,Lateral,Maquina,23,1,10
+2026-04-01,Ombro,Lateral,Maquina,27,2,7
+2026-04-01,Triceps,Triceps,Maquina,15.9,1,10
+2026-04-01,Triceps,Triceps,Maquina,18.1,2,10
+2026-04-01,Peito,Press peito/triceps,Maquina,50,1,10
+2026-04-08,Pernas,Extensora,Maquina,36,1,10
+2026-04-08,Pernas,Extensora,Maquina,43,2,7
+2026-04-08,Pernas,Flexora,Maquina,23,1,11
+2026-04-08,Pernas,Flexora,Maquina,29,2,6
+2026-04-08,Pernas,Abdutora,Maquina,57,1,9
+2026-04-08,Pernas,Abdutora,Maquina,57,2,9
+2026-04-08,Pernas,Adutora,Maquina,36,1,10
+2026-04-08,Pernas,Adutora,Maquina,36,2,8
+2026-04-08,Ombro,Desenvolvimento,Maquina,20,1,10
+2026-04-08,Ombro,Desenvolvimento,Maquina,20,2,7
+2026-04-08,Ombro,Desenvolvimento,Maquina,20,3,26
+2026-04-08,Ombro,Desenvolvimento,Maquina,20,4,10
+2026-04-08,Ombro,Desenvolvimento,Maquina,20,5,26
+2026-04-08,Ombro,Desenvolvimento,Maquina,20,6,9
+2026-04-10,Peito,Supino reto,Maquina com anilha,29,1,10
+2026-04-10,Peito,Supino reto,Maquina com anilha,36,2,8
+2026-04-10,Peito,Supino inclinado,Maquina com anilha,20,1,10
+2026-04-10,Peito,Supino inclinado,Maquina com anilha,25,2,8
+2026-04-10,Peito,Crucifixo,Maquina,52,1,8
+2026-04-10,Peito,Crucifixo,Maquina,52,2,6
+2026-04-10,Costas,Puxada alta,Maquina,45,1,8
+2026-04-10,Costas,Puxada alta,Maquina,45,2,6
+2026-04-10,Costas,Puxada baixa,Maquina,25,1,8
+2026-04-10,Costas,Puxada baixa,Maquina,25,2,8
+2026-04-10,Costas,Puxada lateral,Maquina,29,1,10
+2026-04-10,Costas,Puxada lateral,Maquina,36,2,8
+2026-04-10,Ombro,Lateral,Maquina,23,1,10
+2026-04-10,Ombro,Lateral,Maquina,27,2,7
+2026-04-10,Triceps,Triceps unilateral,Cabo,4.5,1,10
+2026-04-10,Peito,Press peito/triceps,Maquina,50,1,10
+2026-04-14,Peito,Supino reto,Maquina com anilha,36,1,10
+2026-04-14,Peito,Supino reto,Maquina,43,2,8
+2026-04-14,Peito,Supino inclinado,Maquina com anilha,20,1,10
+2026-04-14,Peito,Supino inclinado,Maquina com anilha,30,2,10
+2026-04-14,Peito,Crucifixo,Maquina,45,1,10
+2026-04-14,Peito,Crucifixo,Maquina,52,2,8
+2026-04-14,Costas,Puxada baixa,Maquina,36,1,8
+2026-04-14,Costas,Puxada baixa,Maquina,36,2,6
+2026-04-14,Costas,Puxada lateral,Maquina,29,1,10
+2026-04-14,Costas,Puxada lateral,Maquina,36,2,8
+2026-05-09,Peito,Supino reto,Halter,18,1,7
+2026-05-09,Peito,Supino reto,Halter,18,2,7
+2026-05-09,Peito,Supino inclinado,Maquina com anilha,20,1,10
+2026-05-09,Peito,Supino inclinado,Maquina com anilha,30,2,10
+2026-05-09,Peito,Crucifixo,Maquina,45,1,10
+2026-05-09,Peito,Crucifixo,Maquina,52,2,5
+2026-05-09,Costas,Puxada alta,Maquina,45,1,8
+2026-05-09,Costas,Puxada alta,Maquina,45,2,6
+2026-05-09,Costas,Puxada baixa,Maquina,36,1,8
+2026-05-09,Costas,Puxada baixa,Maquina,36,2,6
+2026-05-09,Costas,Puxada lateral,Maquina,29,1,10
+2026-05-09,Costas,Puxada lateral,Maquina,36,2,10
+2026-05-09,Triceps,Triceps unilateral,Cabo,4.5,1,8
+2026-05-09,Triceps,Triceps unilateral,Cabo,4.5,2,7
+2026-05-09,Peito,Press peito/triceps,Cabo,50,1,10
+2026-05-13,Costas,Puxada alta,Maquina,45,1,10
+2026-05-13,Costas,Puxada alta,Maquina,45,2,10
+2026-05-13,Costas,Puxada baixa,Maquina,36,1,10
+2026-05-13,Costas,Puxada baixa,Maquina,36,2,10
+2026-05-13,Costas,Crucifixo costas,Maquina,32,1,10
+2026-05-13,Costas,Crucifixo costas,Maquina,32,2,10
+2026-05-13,Biceps,Biceps,Maquina,29,1,10
+2026-05-13,Biceps,Biceps,Maquina,29,2,10
+2026-05-13,Antebraco,Biceps antebraco,Maquina,6.5,1,10
+2026-05-13,Antebraco,Biceps antebraco,Maquina,6.5,2,10
+2026-05-19,Peito,Supino inclinado,Halter,18,1,10
+2026-05-19,Peito,Supino inclinado,Halter,20,2,7
+2026-05-19,Peito,Supino inclinado,Halter,20,3,6
+2026-05-19,Peito,Supino reto,Halter,20,1,5
+2026-05-19,Peito,Supino reto,Halter,20,2,5
+2026-05-19,Peito,Supino reto,Halter,20,3,6
+2026-05-19,Peito,Press peito/triceps,Maquina,50,1,10
+2026-05-19,Peito,Press peito/triceps,Maquina,50,2,7
+2026-05-19,Peito,Crucifixo,Maquina,45,1,10
+2026-05-19,Peito,Crucifixo,Maquina,45,2,7
+2026-05-19,Triceps,Triceps,Cabo,18,1,10
+2026-05-19,Triceps,Triceps,Cabo,20,2,6
+2026-06-03,Costas,Puxada alta,Maquina,39,1,9
+2026-06-03,Costas,Puxada alta,Maquina,39,2,9
+2026-06-03,Costas,Puxada alta,Maquina,45,3,4
+2026-06-03,Costas,Puxada baixa,Maquina,23,1,10
+2026-06-03,Costas,Puxada baixa,Maquina,23,2,10
+2026-06-03,Costas,Puxada baixa,Maquina,29,3,9
+2026-06-03,Biceps,Biceps,Maquina,23,1,10
+2026-06-03,Biceps,Biceps,Maquina,23,2,10
+2026-06-03,Biceps,Biceps,Maquina,29,3,4
+2026-06-03,Antebraco,Biceps antebraco,Maquina,6.5,1,8
+2026-06-03,Antebraco,Biceps antebraco,Maquina,6.5,2,10
+2026-06-03,Antebraco,Biceps antebraco,Maquina,6.5,3,10
+2026-06-05,Peito,Supino inclinado,Maquina com anilha,20,1,10
+2026-06-05,Peito,Supino inclinado,Maquina com anilha,30,2,10
+2026-06-05,Peito,Supino inclinado,Maquina com anilha,30,3,5
+2026-06-05,Peito,Supino reto,Halter,20,1,10
+2026-06-05,Peito,Supino reto,Halter,20,2,10
+2026-06-05,Peito,Supino reto,Halter,20,3,10
+2026-06-05,Peito,Press peito/triceps,Maquina,43,1,10
+2026-06-05,Peito,Press peito/triceps,Maquina,50,2,10
+2026-06-05,Peito,Press peito/triceps,Maquina,57,3,8
+2026-06-05,Peito,Crucifixo,Maquina com anilha,39,1,10
+2026-06-05,Peito,Crucifixo,Maquina com anilha,39,2,10
+2026-06-05,Peito,Crucifixo,Maquina,45,3,8
+2026-06-05,Triceps,Triceps,Cabo,15.9,1,10
+2026-06-05,Triceps,Triceps,Cabo,18,2,6
+2026-06-05,Triceps,Triceps,Cabo,18,3,6
+2026-06-05,Triceps,Triceps,Cabo,18,4,6
+2026-06-05,Triceps,Triceps,Cabo,18,5,6
+2026-06-05,Triceps,Triceps,Cabo,18,6,6
+2026-06-07,Pernas,Extensora,Maquina,29,1,10
+2026-06-07,Pernas,Extensora,Maquina,29,2,10
+2026-06-07,Pernas,Extensora,Maquina,29,3,10
+2026-06-07,Pernas,Flexora,Maquina,23,1,10
+2026-06-07,Pernas,Flexora,Maquina,23,2,10
+2026-06-07,Pernas,Flexora,Maquina,23,3,8
+2026-06-07,Pernas,Abdutora,Maquina,40,1,10
+2026-06-07,Pernas,Abdutora,Maquina,40,2,10
+2026-06-07,Pernas,Abdutora,Maquina,40,3,10
+2026-06-07,Pernas,Adutora,Maquina,36,1,10
+2026-06-07,Pernas,Adutora,Maquina,36,2,10
+2026-06-07,Pernas,Adutora,Maquina,36,3,10
+2026-06-11,Biceps,Biceps,Maquina,23,1,10
+2026-06-11,Biceps,Biceps,Maquina,29,2,10
+2026-06-11,Biceps,Biceps,Maquina,36,3,8
+2026-06-11,Biceps,Biceps,Cabo,11.3,1,10
+2026-06-11,Biceps,Biceps,Cabo,13.6,2,10
+2026-06-11,Biceps,Biceps,Cabo,13.6,3,6
+2026-06-11,Antebraco,Biceps antebraco,Maquina,4.5,1,7
+2026-06-11,Antebraco,Biceps antebraco,Maquina,4.5,2,7
+2026-06-11,Antebraco,Biceps antebraco,Maquina,4.5,3,7
+2026-06-11,Antebraco,Biceps antebraco,Maquina,4.5,4,7
+2026-06-11,Antebraco,Biceps antebraco,Maquina,4.5,5,7
+2026-06-11,Triceps,Triceps,Cabo,15.9,1,10
+2026-06-11,Triceps,Triceps,Cabo,15.9,2,8
+2026-06-11,Triceps,Triceps,Cabo,18.1,3,6
+2026-06-11,Triceps,Triceps,Cabo,9.1,1,10
+2026-06-11,Triceps,Triceps,Cabo,11.3,2,10
+2026-06-11,Triceps,Triceps,Cabo,11.3,3,6
+2026-06-11,Triceps,Triceps unilateral,Cabo,6.8,1,6
+2026-06-11,Triceps,Triceps unilateral,Cabo,6.8,2,6
+2026-06-11,Triceps,Triceps unilateral,Cabo,6.8,3,6
+2026-06-11,Triceps,Triceps unilateral,Cabo,6.8,4,6
+2026-06-11,Antebraco,Antebraco puxada,Cabo,6.8,1,10
+2026-06-11,Antebraco,Antebraco puxada,Cabo,9.1,2,10
+2026-06-11,Antebraco,Antebraco puxada,Cabo,11.3,3,2
+2026-06-12,Pernas,Extensora,Maquina,29,1,10
+2026-06-12,Pernas,Extensora,Maquina,36,2,10
+2026-06-12,Pernas,Extensora,Maquina,43,3,8
+2026-06-12,Pernas,Flexora,Maquina,18,1,10
+2026-06-12,Pernas,Flexora,Maquina,18,2,10
+2026-06-12,Pernas,Flexora,Maquina,18,3,8
+2026-06-12,Pernas,Abdutora,Maquina,36,1,10
+2026-06-12,Pernas,Abdutora,Maquina,43,2,10
+2026-06-12,Pernas,Abdutora,Maquina,43,3,10
+2026-06-12,Pernas,Adutora,Maquina,36,1,10
+2026-06-12,Pernas,Adutora,Maquina,36,2,10
+2026-06-12,Pernas,Adutora,Maquina,36,3,10
+2026-06-12,Ombro,Lateral,Maquina,18,1,10
+2026-06-12,Ombro,Lateral,Maquina,18,2,10
+2026-06-12,Ombro,Lateral,Maquina,23,3,10
+2026-06-12,Ombro,Desenvolvimento,Maquina,10,1,10
+2026-06-12,Ombro,Desenvolvimento,Maquina,10,2,10
+2026-06-12,Ombro,Desenvolvimento,Maquina,10,3,10
+2026-06-12,Abdomen,Abdominal,Maquina,29,1,10
+2026-06-12,Abdomen,Abdominal,Maquina,43,2,8
+2026-06-15,Costas,Puxada alta,Maquina,39,1,10
+2026-06-15,Costas,Puxada alta,Maquina,45,2,10
+2026-06-15,Costas,Puxada alta,Maquina,45,3,7
+2026-06-15,Costas,Puxada baixa,Maquina,23,1,10
+2026-06-15,Costas,Puxada baixa,Maquina,29,2,10
+2026-06-15,Costas,Puxada baixa,Maquina,29,3,10
+2026-06-15,Costas,Crucifixo costas,Maquina,25,1,8
+2026-06-15,Costas,Crucifixo costas,Maquina,25,2,7
+2026-06-15,Costas,Crucifixo costas,Maquina,25,3,6
+2026-06-15,Biceps,Biceps,Maquina,23,1,10
+2026-06-15,Biceps,Biceps,Maquina,29,2,10
+2026-06-15,Biceps,Biceps,Maquina,36,3,6
+2026-06-15,Ombro,Lateral,Maquina,18,1,10
+2026-06-15,Ombro,Lateral,Maquina,23,2,10
+2026-06-15,Ombro,Lateral,Maquina,27,3,8
