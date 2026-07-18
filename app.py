@@ -29,7 +29,7 @@ GROUP_CHART_FEATURES = {
 
 
 st.set_page_config(
-    page_title="Acompanhamento da Academia",
+    page_title="Gym Tracker",
     page_icon="",
     layout="wide",
 )
@@ -228,7 +228,7 @@ if not DATA_PATH.exists():
 
 df = load_data(DATA_PATH, DATA_PATH.stat().st_mtime)
 
-st.title("Acompanhamento da Academia")
+st.title("Gym Tracker")
 st.caption("Base importada do WhatsApp, com uma linha por serie.")
 
 with st.sidebar:

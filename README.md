@@ -1,4 +1,4 @@
-# Acompanhamento da Academia
+# Gym Tracker
 
 Projeto em Streamlit para acompanhar treinos registrados no WhatsApp.
 

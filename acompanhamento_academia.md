@@ -1,4 +1,4 @@
-# Acompanhamento da academia
+# Gym Tracker
 
 Atualizado com os registros ate 15/06/2026.
 
