@@ -20,11 +20,30 @@ COLOR_SEQUENCE = [
 PLOTLY_TEMPLATE = "plotly_dark"
 GROUP_CHART_FEATURES = {
     "peso_kg": {"label": "Peso (kg)", "color": "#FF3D3D", "decimals": 1},
-    "repeticoes_melhor_serie": {"label": "Reps melhor serie", "color": "#FFB000", "decimals": 0},
-    "series": {"label": "Series", "color": "#39FF88", "decimals": 0},
+    "repeticoes_melhor_serie": {"label": "Reps melhor série", "color": "#FFB000", "decimals": 0},
+    "series": {"label": "Séries", "color": "#39FF88", "decimals": 0},
     "repeticoes_totais": {"label": "Reps totais", "color": "#FF3D81", "decimals": 0},
     "estimativa_1rm": {"label": "1RM estimado", "color": "#B26DFF", "decimals": 1},
     "volume": {"label": "Volume", "color": "#FF7A00", "decimals": 0},
+}
+GROUP_LABELS = {
+    "Antebraco": "Antebraço",
+    "Biceps": "Bíceps",
+    "Triceps": "Tríceps",
+}
+EXERCISE_LABELS = {
+    "Antebraco dentro": "Antebraço dentro",
+    "Antebraco puxada": "Antebraço puxada",
+    "Biceps": "Bíceps",
+    "Biceps antebraco": "Bíceps antebraço",
+    "Biceps hack": "Bíceps hack",
+    "Biceps zottman": "Bíceps zottman",
+    "Triceps": "Tríceps",
+    "Triceps unilateral": "Tríceps unilateral",
+}
+TYPE_LABELS = {
+    "Maquina": "Máquina",
+    "Maquina com anilha": "Máquina com anilha",
 }
 
 
@@ -92,6 +111,9 @@ def load_data(path: Path, modified_at: float) -> pd.DataFrame:
     df["serie"] = pd.to_numeric(df["serie"], errors="coerce").astype("Int64")
     df["repeticoes"] = pd.to_numeric(df["repeticoes"], errors="coerce").astype("Int64")
     df = df.dropna(subset=["data", "peso_kg", "repeticoes"])
+    df["grupo_muscular"] = df["grupo_muscular"].replace(GROUP_LABELS)
+    df["exercicio"] = df["exercicio"].replace(EXERCISE_LABELS)
+    df["tipo"] = df["tipo"].replace(TYPE_LABELS)
 
     df["volume"] = df["peso_kg"] * df["repeticoes"]
     df["estimativa_1rm"] = df["peso_kg"] * (1 + df["repeticoes"] / 30)
@@ -215,21 +237,21 @@ def build_feature_chart_data(progress: pd.DataFrame, selected_features: list[str
 def metric_axis_label(metric: str) -> str:
     return {
         "peso_kg": "Maior carga",
-        "repeticoes": "Repeticoes totais",
-        "series": "Series",
+        "repeticoes": "Repetições totais",
+        "series": "Séries",
         "estimativa_1rm": "1RM estimado",
     }[metric]
 
 
 if not DATA_PATH.exists():
-    st.error(f"Arquivo nao encontrado: {DATA_PATH}")
+    st.error(f"Arquivo não encontrado: {DATA_PATH}")
     st.stop()
 
 
 df = load_data(DATA_PATH, DATA_PATH.stat().st_mtime)
 
 st.title("Gym Tracker")
-st.caption("Base importada do WhatsApp, com uma linha por serie.")
+st.caption("Base importada do WhatsApp, com uma linha por série.")
 
 with st.sidebar:
     st.header("Filtros")
@@ -237,7 +259,7 @@ with st.sidebar:
     min_date = df["data"].min().date()
     max_date = df["data"].max().date()
     date_range = st.date_input(
-        "Periodo",
+        "Período",
         value=(min_date, max_date),
         min_value=min_date,
         max_value=max_date,
@@ -252,13 +274,13 @@ with st.sidebar:
     groups = select_all_or_one("Grupo muscular", all_groups)
 
     available_after_group = df[df["grupo_muscular"].isin(groups)] if groups else df.iloc[0:0]
-    exercises = filter_multiselect("Exercicio", sorted(available_after_group["exercicio"].unique()))
+    exercises = filter_multiselect("Exercício", sorted(available_after_group["exercicio"].unique()))
 
     available_after_exercise = available_after_group[available_after_group["exercicio"].isin(exercises)] if exercises else available_after_group.iloc[0:0]
     types = filter_multiselect("Tipo", sorted(available_after_exercise["tipo"].unique()))
 
     metric_choice = st.selectbox(
-        "Metrica principal",
+        "Métrica principal",
         options=[
             "peso_kg",
             "repeticoes",
@@ -267,8 +289,8 @@ with st.sidebar:
         ],
         format_func={
             "peso_kg": "Carga",
-            "repeticoes": "Repeticoes",
-            "series": "Series",
+            "repeticoes": "Repetições",
+            "series": "Séries",
             "estimativa_1rm": "1RM estimado",
         }.get,
     )
@@ -297,31 +319,23 @@ kpi_cols = st.columns(5)
 with kpi_cols[0]:
     metric_card("Dias registrados", str(days_count))
 with kpi_cols[1]:
-    metric_card("Series", str(series_count))
+    metric_card("Séries", str(series_count))
 with kpi_cols[2]:
-    metric_card("Repeticoes", format_number(reps_total))
+    metric_card("Repetições", format_number(reps_total))
 with kpi_cols[3]:
     metric_card("Maior carga", f"{format_number(best_load, 1)} kg")
 with kpi_cols[4]:
-    metric_card("Maior 1RM estimado", f"{format_number(best_1rm, 1)} kg", "Formula de Epley: peso x (1 + reps/30)")
+    metric_card("Maior 1RM estimado", f"{format_number(best_1rm, 1)} kg", "Fórmula de Epley: peso x (1 + reps/30)")
 
-with st.expander("O que e 1RM estimado?"):
+with st.expander("O que é 1RM estimado?"):
     st.write(
-        "1RM estimado e uma estimativa de quanto peso voce conseguiria levantar em uma repeticao maxima. "
-        "Aqui uso a formula de Epley: peso x (1 + repeticoes / 30). "
-        "E util para comparar progresso quando voce muda reps e carga, mas nao e uma medida perfeita."
-    )
-
-with st.expander("Supino reto, supino maquina e press sao a mesma coisa?"):
-    st.write(
-        "Nao exatamente. Supino reto com halter mede o movimento livre, com mais estabilizacao. "
-        "Supino reto na maquina segue o caminho do aparelho. Press peito/triceps ficou separado porque as anotacoes "
-        "indicavam uma maquina parecida com press/chest press, mas com participacao forte de triceps. "
-        "Para acompanhar progresso, compare cada variacao dentro do mesmo tipo."
+        "1RM estimado é uma estimativa de quanto peso você conseguiria levantar em uma repetição máxima. "
+        "Aqui uso a fórmula de Epley: peso x (1 + repetições / 30). "
+        "É útil para comparar progresso quando você muda reps e carga, mas não é uma medida perfeita."
     )
 
 tab_overview, tab_groups, tab_progress, tab_records, tab_data = st.tabs(
-    ["Visao geral", "Grupos", "Evolucao", "Records", "Dados"]
+    ["Visão geral", "Grupos", "Evolução", "Records", "Dados"]
 )
 
 with tab_overview:
@@ -334,7 +348,7 @@ with tab_overview:
     )
 
     with left:
-        st.subheader("Series semanais por grupo")
+        st.subheader("Séries semanais por grupo")
         fig = px.bar(
             weekly_group,
             x="semana",
@@ -344,7 +358,7 @@ with tab_overview:
             color_discrete_sequence=COLOR_SEQUENCE,
             labels={
                 "semana": "Semana",
-                "series": "Series",
+                "series": "Séries",
                 "grupo_muscular": "Grupo",
             },
         )
@@ -364,7 +378,7 @@ with tab_overview:
     )
 
     with right:
-        st.subheader("Series por grupo")
+        st.subheader("Séries por grupo")
         fig = px.bar(
             group_summary,
             x="series",
@@ -372,7 +386,7 @@ with tab_overview:
             color="grupo_muscular",
             orientation="h",
             color_discrete_sequence=COLOR_SEQUENCE,
-            labels={"series": "Series", "grupo_muscular": "Grupo"},
+            labels={"series": "Séries", "grupo_muscular": "Grupo"},
         )
         theme_figure(fig)
         fig.update_layout(showlegend=False, yaxis={"categoryorder": "total ascending"})
@@ -383,8 +397,8 @@ with tab_overview:
         group_summary.rename(
             columns={
                 "grupo_muscular": "Grupo",
-                "series": "Series",
-                "repeticoes": "Repeticoes",
+                "series": "Séries",
+                "repeticoes": "Repetições",
                 "treinos": "Dias",
                 "maior_carga": "Maior carga",
                 "volume": "Volume",
@@ -395,8 +409,8 @@ with tab_overview:
     )
 
 with tab_groups:
-    st.subheader("Paineis por grupo muscular")
-    st.caption("Escolha exercicios dentro de cada grupo para ver a evolucao sem misturar movimentos de grupos diferentes.")
+    st.subheader("Painéis por grupo muscular")
+    st.caption("Escolha exercícios dentro de cada grupo para ver a evolução sem misturar movimentos de grupos diferentes.")
 
     group_names = sorted(filtered["grupo_muscular"].unique())
     group_tabs = st.tabs(group_names)
@@ -406,7 +420,7 @@ with tab_groups:
             group_data = filtered[filtered["grupo_muscular"] == group_name].copy()
             group_exercises = sorted(group_data["exercicio"].unique())
             selected_group_exercises = st.multiselect(
-                "Exercicios do grupo",
+                "Exercícios do grupo",
                 options=group_exercises,
                 default=group_exercises,
                 key=f"group_exercises_{group_name}",
@@ -414,22 +428,22 @@ with tab_groups:
             group_view = group_data[group_data["exercicio"].isin(selected_group_exercises)].copy()
 
             if group_view.empty:
-                st.info("Selecione pelo menos um exercicio para ver este painel.")
+                st.info("Selecione pelo menos um exercício para ver este painel.")
                 continue
 
             gcols = st.columns(4)
             with gcols[0]:
                 metric_card("Volume do grupo", f"{format_number(group_view['volume'].sum())} kgxrep")
             with gcols[1]:
-                metric_card("Exercicios", str(group_view["exercicio"].nunique()))
+                metric_card("Exercícios", str(group_view["exercicio"].nunique()))
             with gcols[2]:
-                metric_card("Series", str(len(group_view)))
+                metric_card("Séries", str(len(group_view)))
             with gcols[3]:
                 metric_card("Melhor carga", f"{format_number(group_view['peso_kg'].max(), 1)} kg")
 
             exercise_options = sorted(group_view["exercicio_tipo"].unique())
             focused_exercise = st.selectbox(
-                "Exercicio para evolucao",
+                "Exercício para evolução",
                 options=exercise_options,
                 key=f"focused_exercise_{group_name}",
             )
@@ -439,7 +453,7 @@ with tab_groups:
             chart_left, chart_right = st.columns((1.4, 1))
             with chart_left:
                 selected_features = st.multiselect(
-                    "Metricas no grafico",
+                    "Métricas no gráfico",
                     options=list(GROUP_CHART_FEATURES.keys()),
                     default=["peso_kg", "repeticoes_melhor_serie", "series"],
                     format_func=lambda key: GROUP_CHART_FEATURES[key]["label"],
@@ -454,7 +468,7 @@ with tab_groups:
                 )
 
             if not selected_features:
-                st.info("Escolha pelo menos uma metrica para desenhar o grafico.")
+                st.info("Escolha pelo menos uma métrica para desenhar o gráfico.")
             else:
                 normalize_chart = scale_mode == "Normalizado 0-100"
                 chart_data = build_feature_chart_data(progress, selected_features, normalize_chart)
@@ -473,7 +487,7 @@ with tab_groups:
                     labels={
                         "data": "Data",
                         "valor_plot": "Escala normalizada (0-100)" if normalize_chart else "Valor",
-                        "metrica": "Metrica",
+                        "metrica": "Métrica",
                     },
                 )
                 fig.update_traces(
@@ -483,17 +497,17 @@ with tab_groups:
                 )
                 theme_figure(fig)
                 fig.update_layout(
-                    title=f"Evolucao: {focused_exercise}",
+                    title=f"Evolução: {focused_exercise}",
                     hovermode="x unified",
                 )
                 if not normalize_chart and all(GROUP_CHART_FEATURES[feature]["decimals"] == 0 for feature in selected_features):
                     fig.update_yaxes(tickformat="d")
                 st.plotly_chart(fig, use_container_width=True)
 
-            with st.expander("Como ler este grafico"):
+            with st.expander("Como ler este gráfico"):
                 st.write(
-                    "Em valores reais, cada linha usa a propria unidade da metrica escolhida. "
-                    "Se as escalas ficarem muito diferentes, use `Normalizado 0-100`: cada linha passa a mostrar a evolucao relativa dentro do periodo selecionado."
+                    "Em valores reais, cada linha usa a própria unidade da métrica escolhida. "
+                    "Se as escalas ficarem muito diferentes, use `Normalizado 0-100`: cada linha passa a mostrar a evolução relativa dentro do período selecionado."
                 )
 
             exercise_summary = (
@@ -511,10 +525,10 @@ with tab_groups:
             st.dataframe(
                 exercise_summary.rename(
                     columns={
-                        "exercicio": "Exercicio",
+                        "exercicio": "Exercício",
                         "tipo": "Tipo",
-                        "series": "Series",
-                        "repeticoes": "Repeticoes",
+                        "series": "Séries",
+                        "repeticoes": "Repetições",
                         "dias": "Dias",
                         "maior_carga": "Maior carga",
                         "melhor_1rm": "Melhor 1RM",
@@ -526,7 +540,7 @@ with tab_groups:
             )
 
 with tab_progress:
-    st.subheader("Evolucao por exercicio e tipo")
+    st.subheader("Evolução por exercício e tipo")
 
     daily = daily_progress(filtered)
 
@@ -540,7 +554,7 @@ with tab_progress:
         labels={
             "data": "Data",
             metric_choice: metric_axis_label(metric_choice),
-            "exercicio_tipo": "Exercicio",
+            "exercicio_tipo": "Exercício",
         },
     )
     theme_figure(fig)
@@ -548,7 +562,7 @@ with tab_progress:
         fig.update_yaxes(tickformat="d")
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("Series mensais")
+    st.subheader("Séries mensais")
     monthly = (
         filtered.groupby(["mes", "grupo_muscular"], as_index=False)
         .agg(series=("serie", "count"), repeticoes=("repeticoes", "sum"))
@@ -560,14 +574,14 @@ with tab_progress:
         y="series",
         color="grupo_muscular",
         color_discrete_sequence=COLOR_SEQUENCE,
-        labels={"mes": "Mes", "series": "Series", "grupo_muscular": "Grupo"},
+        labels={"mes": "Mês", "series": "Séries", "grupo_muscular": "Grupo"},
     )
     theme_figure(fig)
     fig.update_yaxes(tickformat="d")
     st.plotly_chart(fig, use_container_width=True)
 
 with tab_records:
-    st.subheader("Melhores marcas por exercicio")
+    st.subheader("Melhores marcas por exercício")
 
     records = (
         filtered.sort_values(["peso_kg", "repeticoes", "estimativa_1rm"], ascending=False)
@@ -590,18 +604,18 @@ with tab_records:
     ].rename(
         columns={
             "grupo_muscular": "Grupo",
-            "exercicio": "Exercicio",
+            "exercicio": "Exercício",
             "tipo": "Tipo",
             "data": "Data",
             "peso_kg": "Maior carga",
             "repeticoes": "Reps",
             "estimativa_1rm": "1RM estimado",
-            "volume": "Volume da serie",
+            "volume": "Volume da série",
         }
     )
     st.dataframe(records_table, use_container_width=True, hide_index=True)
 
-    st.subheader("Top series por 1RM estimado")
+    st.subheader("Top séries por 1RM estimado")
     top_sets = filtered.nlargest(20, "estimativa_1rm")[
         [
             "data",
@@ -616,7 +630,7 @@ with tab_records:
         columns={
             "data": "Data",
             "grupo_muscular": "Grupo",
-            "exercicio": "Exercicio",
+            "exercicio": "Exercício",
             "tipo": "Tipo",
             "peso_kg": "Peso",
             "repeticoes": "Reps",

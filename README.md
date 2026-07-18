@@ -23,4 +23,4 @@ python -m streamlit run app.py
 python gerar_csv_whatsapp.py
 ```
 
-O CSV usa uma linha por serie, com colunas para data, grupo muscular, exercicio, tipo, peso, serie e repeticoes.
+O CSV usa uma linha por série, com colunas para data, grupo muscular, exercício, tipo, peso, série e repetições.
