@@ -1,11 +1,9 @@
-from pathlib import Path
-
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from gym_tracker.data_adapter import DataBackendError, data_signature, load_dashboard_data
 
-DATA_PATH = Path("academia_treinos_whatsapp.csv")
 COLOR_SEQUENCE = [
     "#FF3D3D",
     "#FF3D81",
@@ -26,27 +24,6 @@ GROUP_CHART_FEATURES = {
     "estimativa_1rm": {"label": "1RM estimado", "color": "#B26DFF", "decimals": 1},
     "volume": {"label": "Volume", "color": "#FF7A00", "decimals": 0},
 }
-GROUP_LABELS = {
-    "Antebraco": "Antebraço",
-    "Biceps": "Bíceps",
-    "Triceps": "Tríceps",
-}
-EXERCISE_LABELS = {
-    "Antebraco dentro": "Antebraço dentro",
-    "Antebraco puxada": "Antebraço puxada",
-    "Biceps": "Bíceps",
-    "Biceps antebraco": "Bíceps antebraço",
-    "Biceps hack": "Bíceps hack",
-    "Biceps zottman": "Bíceps zottman",
-    "Triceps": "Tríceps",
-    "Triceps unilateral": "Tríceps unilateral",
-}
-TYPE_LABELS = {
-    "Maquina": "Máquina",
-    "Maquina com anilha": "Máquina com anilha",
-}
-
-
 st.set_page_config(
     page_title="Gym Tracker",
     page_icon="",
@@ -104,23 +81,8 @@ st.markdown(
 
 
 @st.cache_data
-def load_data(path: Path, modified_at: float) -> pd.DataFrame:
-    df = pd.read_csv(path)
-    df["data"] = pd.to_datetime(df["data"])
-    df["peso_kg"] = pd.to_numeric(df["peso_kg"], errors="coerce")
-    df["serie"] = pd.to_numeric(df["serie"], errors="coerce").astype("Int64")
-    df["repeticoes"] = pd.to_numeric(df["repeticoes"], errors="coerce").astype("Int64")
-    df = df.dropna(subset=["data", "peso_kg", "repeticoes"])
-    df["grupo_muscular"] = df["grupo_muscular"].replace(GROUP_LABELS)
-    df["exercicio"] = df["exercicio"].replace(EXERCISE_LABELS)
-    df["tipo"] = df["tipo"].replace(TYPE_LABELS)
-
-    df["volume"] = df["peso_kg"] * df["repeticoes"]
-    df["estimativa_1rm"] = df["peso_kg"] * (1 + df["repeticoes"] / 30)
-    df["semana"] = df["data"].dt.to_period("W-MON").dt.start_time
-    df["mes"] = df["data"].dt.to_period("M").dt.to_timestamp()
-    df["exercicio_tipo"] = df["exercicio"] + " - " + df["tipo"]
-    return df
+def load_data(signature: str) -> pd.DataFrame:
+    return load_dashboard_data()
 
 
 def format_number(value: float, decimals: int = 0) -> str:
@@ -243,12 +205,11 @@ def metric_axis_label(metric: str) -> str:
     }[metric]
 
 
-if not DATA_PATH.exists():
-    st.error(f"Arquivo não encontrado: {DATA_PATH}")
+try:
+    df = load_data(data_signature())
+except DataBackendError as error:
+    st.error(str(error))
     st.stop()
-
-
-df = load_data(DATA_PATH, DATA_PATH.stat().st_mtime)
 
 st.title("Gym Tracker")
 st.caption("Base importada do WhatsApp, com uma linha por série.")
@@ -276,7 +237,11 @@ with st.sidebar:
     available_after_group = df[df["grupo_muscular"].isin(groups)] if groups else df.iloc[0:0]
     exercises = filter_multiselect("Exercício", sorted(available_after_group["exercicio"].unique()))
 
-    available_after_exercise = available_after_group[available_after_group["exercicio"].isin(exercises)] if exercises else available_after_group.iloc[0:0]
+    available_after_exercise = (
+        available_after_group[available_after_group["exercicio"].isin(exercises)]
+        if exercises
+        else available_after_group.iloc[0:0]
+    )
     types = filter_multiselect("Tipo", sorted(available_after_exercise["tipo"].unique()))
 
     metric_choice = st.selectbox(
@@ -410,12 +375,14 @@ with tab_overview:
 
 with tab_groups:
     st.subheader("Painéis por grupo muscular")
-    st.caption("Escolha exercícios dentro de cada grupo para ver a evolução sem misturar movimentos de grupos diferentes.")
+    st.caption(
+        "Escolha exercícios dentro de cada grupo para ver a evolução sem misturar movimentos de grupos diferentes."
+    )
 
     group_names = sorted(filtered["grupo_muscular"].unique())
     group_tabs = st.tabs(group_names)
 
-    for group_name, group_tab in zip(group_names, group_tabs):
+    for group_name, group_tab in zip(group_names, group_tabs, strict=True):
         with group_tab:
             group_data = filtered[filtered["grupo_muscular"] == group_name].copy()
             group_exercises = sorted(group_data["exercicio"].unique())
@@ -472,10 +439,7 @@ with tab_groups:
             else:
                 normalize_chart = scale_mode == "Normalizado 0-100"
                 chart_data = build_feature_chart_data(progress, selected_features, normalize_chart)
-                color_map = {
-                    config["label"]: config["color"]
-                    for config in GROUP_CHART_FEATURES.values()
-                }
+                color_map = {config["label"]: config["color"] for config in GROUP_CHART_FEATURES.values()}
                 fig = px.line(
                     chart_data,
                     x="data",
@@ -493,21 +457,26 @@ with tab_groups:
                 fig.update_traces(
                     line={"width": 3},
                     marker={"size": 9},
-                    hovertemplate="<b>%{customdata[0]}</b><br>Data: %{x|%d/%m/%Y}<br>Valor: %{customdata[1]}<extra></extra>",
+                    hovertemplate=(
+                        "<b>%{customdata[0]}</b><br>Data: %{x|%d/%m/%Y}<br>Valor: %{customdata[1]}<extra></extra>"
+                    ),
                 )
                 theme_figure(fig)
                 fig.update_layout(
                     title=f"Evolução: {focused_exercise}",
                     hovermode="x unified",
                 )
-                if not normalize_chart and all(GROUP_CHART_FEATURES[feature]["decimals"] == 0 for feature in selected_features):
+                if not normalize_chart and all(
+                    GROUP_CHART_FEATURES[feature]["decimals"] == 0 for feature in selected_features
+                ):
                     fig.update_yaxes(tickformat="d")
                 st.plotly_chart(fig, use_container_width=True)
 
             with st.expander("Como ler este gráfico"):
                 st.write(
                     "Em valores reais, cada linha usa a própria unidade da métrica escolhida. "
-                    "Se as escalas ficarem muito diferentes, use `Normalizado 0-100`: cada linha passa a mostrar a evolução relativa dentro do período selecionado."
+                    "Se as escalas ficarem muito diferentes, use `Normalizado 0-100`: "
+                    "cada linha passa a mostrar a evolução relativa dentro do período selecionado."
                 )
 
             exercise_summary = (

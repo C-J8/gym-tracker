@@ -2,3 +2,18 @@ __pycache__/
 *.py[cod]
 streamlit.out.log
 streamlit.err.log
+.venv/
+.uv-cache/
+.env
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+quality_reports/
+*.db
+*.sqlite*
+
+# Exports reais podem conter nomes, telefones e conversas pessoais.
+whatsapp_*_export/
+*Conversa do WhatsApp*.txt
+*.zip
