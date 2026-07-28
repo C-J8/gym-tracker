@@ -179,6 +179,7 @@ class ImportMessageOccurrence(TimestampMixin, Base):
     source_index: Mapped[int] = mapped_column(Integer, nullable=False)
     source_offset: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     occurrence_ordinal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    timestamp_precision: Mapped[str] = mapped_column(String(10), nullable=False, default="minute")
 
     import_record: Mapped[Import] = relationship(back_populates="message_occurrences")
     raw_message: Mapped[RawMessage] = relationship(back_populates="occurrences")
