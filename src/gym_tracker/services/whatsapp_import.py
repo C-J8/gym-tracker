@@ -35,7 +35,11 @@ from gym_tracker.repositories.state import bump_data_revision
 from gym_tracker.schemas import ParseOutcome, QualityReport, WhatsAppMessage, WorkoutExtraction
 from gym_tracker.services.llm_extractor import OpenAIWorkoutExtractor, WorkoutExtractor
 from gym_tracker.services.loads import validate_materializable_load
-from gym_tracker.services.normalization import normalize_message_content, normalize_text
+from gym_tracker.services.normalization import (
+    explicit_equipment,
+    normalize_message_content,
+    normalize_text,
+)
 from gym_tracker.services.parser import normalized_set_signatures, parse_workout_message, split_whatsapp_messages
 from gym_tracker.services.validation import count_reasons, review_reasons
 
@@ -52,6 +56,17 @@ def _timestamp_key(value: datetime) -> str:
     return value.astimezone(UTC).isoformat() if value.tzinfo else value.isoformat()
 
 
+def _identity_timestamp_key(value: datetime, precision: str) -> str:
+    if precision == "minute" or (precision == "second" and value.second == 0 and value.microsecond == 0):
+        return f"minute:{_timestamp_key(value.replace(second=0, microsecond=0))}"
+    return f"second:{_timestamp_key(value.replace(microsecond=0))}"
+
+
+def _comparable_datetime(value: datetime) -> datetime:
+    localized = value if value.tzinfo else value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+    return localized.astimezone(UTC)
+
+
 def _message_identity(
     user_id: uuid.UUID,
     message: WhatsAppMessage,
@@ -62,8 +77,7 @@ def _message_identity(
         (
             str(user_id),
             normalize_text(message.sender_raw),
-            _timestamp_key(message.sent_at),
-            message.timestamp_precision,
+            _identity_timestamp_key(message.sent_at, message.timestamp_precision),
             normalized_content_sha256,
             str(message.is_edited),
             str(occurrence_ordinal),
@@ -77,13 +91,21 @@ def _resolve_database_context(session: Session, user_id: uuid.UUID, outcome: Par
         return outcome
     remaining_reasons = list(outcome.reasons)
     for exercise in outcome.extraction.exercises:
+        equipment_in_message = explicit_equipment(exercise.raw_name)
+        equipment_in_context = explicit_equipment(outcome.extraction.workout_type or "")
         alias = find_alias(session, exercise.raw_name, user_id)
         if exercise.canonical_name is None and alias is not None:
             exercise.canonical_name = alias.canonical_name
             exercise.muscle_group = alias.muscle_group
-        if exercise.equipment is None and alias is not None and alias.equipment is not None:
+        if equipment_in_message is not None:
+            exercise.equipment = equipment_in_message
+            exercise.load_basis = "por_halter" if equipment_in_message == "Halter" else "total"
+        elif alias is not None and alias.equipment is not None:
             exercise.equipment = alias.equipment
             exercise.load_basis = alias.load_basis
+        elif equipment_in_context is not None:
+            exercise.equipment = equipment_in_context
+            exercise.load_basis = "por_halter" if equipment_in_context == "Halter" else "total"
         if exercise.equipment is None and exercise.canonical_name:
             confirmed = find_confirmed_variant(session, exercise.canonical_name, user_id)
             if confirmed is not None:
@@ -242,20 +264,34 @@ def _existing_result_for_version(
 
 
 def _has_content_conflict(session: Session, message: RawMessage) -> bool:
-    return (
-        session.scalar(
-            select(RawMessage.id).where(
-                RawMessage.user_id == message.user_id,
-                RawMessage.sender_normalized == message.sender_normalized,
-                RawMessage.sent_at == message.sent_at,
-                RawMessage.timestamp_precision == message.timestamp_precision,
-                RawMessage.occurrence_ordinal == message.occurrence_ordinal,
-                RawMessage.normalized_content_sha256 != message.normalized_content_sha256,
-                RawMessage.id != message.id,
-            )
+    candidates = session.scalars(
+        select(RawMessage).where(
+            RawMessage.user_id == message.user_id,
+            RawMessage.sender_normalized == message.sender_normalized,
+            RawMessage.occurrence_ordinal == message.occurrence_ordinal,
+            RawMessage.id != message.id,
         )
-        is not None
     )
+    message_time = _comparable_datetime(message.sent_at)
+    message_minute = message_time.replace(second=0, microsecond=0)
+    for candidate in candidates:
+        candidate_time = _comparable_datetime(candidate.sent_at)
+        candidate_minute = candidate_time.replace(second=0, microsecond=0)
+        if candidate_minute != message_minute:
+            continue
+        precisions = {candidate.timestamp_precision, message.timestamp_precision}
+        if precisions == {"minute", "second"}:
+            second_message = candidate if candidate.timestamp_precision == "second" else message
+            if second_message.sent_at.second != 0:
+                return True
+        elif candidate_time != message_time:
+            continue
+        if (
+            candidate.normalized_content_sha256 != message.normalized_content_sha256
+            or candidate.is_edited != message.is_edited
+        ):
+            return True
+    return False
 
 
 def _ingest_messages(
@@ -273,8 +309,7 @@ def _ingest_messages(
         normalized_content_sha256 = _sha256_text(normalize_message_content(message.raw_content))
         exact_key = (
             normalize_text(message.sender_raw),
-            _timestamp_key(message.sent_at),
-            message.timestamp_precision,
+            _identity_timestamp_key(message.sent_at, message.timestamp_precision),
             normalized_content_sha256,
             message.is_edited,
         )
@@ -317,6 +352,7 @@ def _ingest_messages(
                 source_index=message.source_index,
                 source_offset=message.source_offset,
                 occurrence_ordinal=occurrence_ordinal,
+                timestamp_precision=message.timestamp_precision,
             )
         )
         canonical_messages.append(raw_message)
@@ -339,7 +375,7 @@ def _to_message(raw: RawMessage, occurrence: ImportMessageOccurrence | None = No
         source_index=occurrence.source_index if occurrence else raw.source_index,
         source_offset=occurrence.source_offset if occurrence else raw.source_offset,
         sent_at=sent_at,
-        timestamp_precision=raw.timestamp_precision,
+        timestamp_precision=occurrence.timestamp_precision if occurrence else raw.timestamp_precision,
         sender_raw=raw.sender_raw,
         raw_content=raw.raw_content,
         content_sha256=raw.content_sha256,

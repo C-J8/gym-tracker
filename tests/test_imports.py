@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from gym_tracker.config import Settings
 from gym_tracker.models import (
+    ExerciseAlias,
+    ExerciseVariant,
     Import,
     ImportMessageOccurrence,
     ParseResult,
@@ -147,6 +149,64 @@ def test_identical_occurrences_in_same_minute_are_preserved(
     assert session.scalar(select(func.count()).select_from(ImportMessageOccurrence)) == 2
 
 
+def test_minute_and_zero_seconds_reuse_message_and_preserve_occurrence_precision(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    minute = write_export(tmp_path / "minute.txt", "01/01/2026 10:00 - Pessoa: Extensora 40kg/10rep")
+    second = write_export(tmp_path / "second.txt", "01/01/2026 10:00:00 - Pessoa: Extensora 40kg/10rep")
+
+    import_whatsapp_file(session, minute, user.id, settings=settings())
+    session.commit()
+    report = import_whatsapp_file(session, second, user.id, settings=settings())
+    session.commit()
+
+    assert report.messages_new == 0
+    assert report.messages_reused == 1
+    assert report.conflicting_messages == 0
+    assert session.scalar(select(func.count()).select_from(RawMessage)) == 1
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 1
+    occurrences = list(session.scalars(select(ImportMessageOccurrence).order_by(ImportMessageOccurrence.created_at)))
+    assert [item.timestamp_precision for item in occurrences] == ["minute", "second"]
+
+
+def test_comparable_timestamps_with_different_content_create_review(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    original = write_export(tmp_path / "minute-original.txt", "01/01/2026 10:00 - Pessoa: Extensora 40kg/10rep")
+    changed = write_export(tmp_path / "second-changed.txt", "01/01/2026 10:00:00 - Pessoa: Extensora 45kg/8rep")
+
+    import_whatsapp_file(session, original, user.id, settings=settings())
+    session.commit()
+    report = import_whatsapp_file(session, changed, user.id, settings=settings())
+
+    assert report.conflicting_messages == 1
+    assert report.messages_pending_review == 1
+    assert session.scalar(select(func.count()).select_from(RawMessage)) == 2
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 1
+
+
+def test_minute_and_nonzero_seconds_preserve_ambiguity_for_review(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    minute = write_export(tmp_path / "minute-ambiguous.txt", "01/01/2026 10:00 - Pessoa: Extensora 40kg/10rep")
+    second = write_export(tmp_path / "second-ambiguous.txt", "01/01/2026 10:00:30 - Pessoa: Extensora 40kg/10rep")
+
+    import_whatsapp_file(session, minute, user.id, settings=settings())
+    session.commit()
+    report = import_whatsapp_file(session, second, user.id, settings=settings())
+
+    assert report.conflicting_messages == 1
+    assert report.messages_pending_review == 1
+    assert session.scalar(select(func.count()).select_from(RawMessage)) == 2
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 1
+
+
 def test_possible_edit_creates_review_and_preserves_previous_active_result(
     session: Session,
     user: User,
@@ -179,6 +239,73 @@ def test_known_user_alias_resolves_exercise_and_equipment_before_llm(
     report = import_whatsapp_file(session, source, user.id, settings=settings(), extractor=extractor)
     assert report.sets_accepted == 1
     assert extractor.calls == 0
+
+
+def test_user_alias_equipment_overrides_catalog_default_for_all_sets(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    exercise = get_or_create_exercise(session, "Puxada alta", "Costas")
+    save_alias(session, "puxada alta", exercise, "Cabo", user.id)
+    session.commit()
+    source = write_export(
+        tmp_path / "alias-equipment.txt",
+        "01/01/2026 10:00 - Pessoa: Puxada alta 40kg/10rep ... 45kg/8rep",
+    )
+
+    report = import_whatsapp_file(session, source, user.id, settings=settings())
+    variants = list(
+        session.scalars(
+            select(ExerciseVariant).join(WorkoutSet, WorkoutSet.exercise_variant_id == ExerciseVariant.id).distinct()
+        )
+    )
+
+    assert report.sets_accepted == 2
+    assert report.messages_pending_review == 0
+    assert [item.equipment for item in variants] == ["Cabo"]
+
+
+def test_explicit_equipment_overrides_user_alias(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    exercise = get_or_create_exercise(session, "Puxada alta", "Costas")
+    save_alias(session, "puxada alta", exercise, "Cabo", user.id)
+    session.commit()
+    source = write_export(
+        tmp_path / "explicit-equipment.txt",
+        "01/01/2026 10:00 - Pessoa: Puxada alta máquina 40kg/10rep",
+    )
+
+    report = import_whatsapp_file(session, source, user.id, settings=settings())
+    variant = session.scalar(
+        select(ExerciseVariant).join(WorkoutSet, WorkoutSet.exercise_variant_id == ExerciseVariant.id)
+    )
+
+    assert report.sets_accepted == 1
+    assert variant is not None and variant.equipment == "Máquina"
+
+
+def test_explicit_block_context_is_used_after_alias_lookup(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    source = write_export(
+        tmp_path / "context-equipment.txt",
+        "01/01/2026 10:00 - Pessoa: Cabo\nPuxada alta 40kg/10rep",
+    )
+
+    report = import_whatsapp_file(session, source, user.id, settings=settings())
+    variant = session.scalar(
+        select(ExerciseVariant).join(WorkoutSet, WorkoutSet.exercise_variant_id == ExerciseVariant.id)
+    )
+
+    assert report.sets_accepted == 1
+    assert report.messages_pending_review == 0
+    assert variant is not None and variant.equipment == "Cabo"
 
 
 def test_single_confirmed_variant_can_resolve_missing_equipment(
@@ -300,6 +427,57 @@ def test_non_shadow_without_auto_accept_still_requires_review(
     )
     assert report.sets_accepted == 0
     assert report.messages_pending_review == 1
+
+
+def test_uncertain_llm_proposal_never_replaces_previous_active_result(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    exercise = get_or_create_exercise(session, "Rosca X", "Bíceps")
+    alias = save_alias(session, "mov x", exercise, "Halter", user.id)
+    session.commit()
+    source = write_export(tmp_path / "uncertain-llm.txt", "01/01/2026 10:00 - Pessoa: Mov X 10kg/10rep")
+    first = import_whatsapp_file(session, source, user.id, settings=settings("v1"))
+    session.commit()
+    session.delete(session.get(ExerciseAlias, alias.id))
+    session.commit()
+    proposal = WorkoutExtraction(
+        workout_date="2026-01-01",
+        needs_review=True,
+        exercises=[
+            ExercisePayload(
+                raw_name="Mov X",
+                canonical_name="Rosca X",
+                muscle_group="Bíceps",
+                equipment="Halter",
+                sets=[SetPayload(weight_kg=10, reps=10)],
+                uncertain_fields=["equipment"],
+                needs_review=True,
+            )
+        ],
+    )
+
+    second = import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings("v2", llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=MockWorkoutExtractor(result=proposal),
+    )
+    review = session.scalar(select(ParseReview))
+    active_result = session.scalar(select(ParseResult).where(ParseResult.is_active.is_(True)))
+
+    assert first.sets_accepted == 1
+    assert second.sets_accepted == 0
+    assert second.messages_pending_review == 1
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 1
+    assert session.scalar(select(func.count()).select_from(ParseReview)) == 1
+    assert review is not None
+    assert "exercicio desconhecido" in review.reason
+    assert review.proposed_payload["llm"]["needs_review"] is True
+    assert review.proposed_payload["llm"]["exercises"][0]["uncertain_fields"] == ["equipment"]
+    assert active_result is not None and active_result.parse_run.parser_version == "v1"
 
 
 def test_accept_and_reject_review_are_single_use(session: Session, user: User, tmp_path: Path) -> None:

@@ -9,11 +9,17 @@ def review_reasons(outcome: ParseOutcome, known_alias: bool = True) -> list[str]
     extraction = outcome.extraction
     if extraction is None:
         return reasons
+    if extraction.needs_review:
+        reasons.append("payload marcado para revisao")
     if not known_alias:
         reasons.append("exercicio ou alias desconhecido")
     if extraction.unconsumed_text:
         reasons.append("tokens relevantes nao consumidos")
     for exercise in extraction.exercises:
+        if exercise.needs_review:
+            reasons.append(f"exercicio marcado para revisao: {exercise.raw_name}")
+        if exercise.uncertain_fields:
+            reasons.append(f"campos incertos para {exercise.raw_name}: {', '.join(exercise.uncertain_fields)}")
         if not exercise.canonical_name or not exercise.muscle_group or not exercise.equipment:
             reasons.append(f"campos ausentes para {exercise.raw_name}")
         for item in exercise.sets:
