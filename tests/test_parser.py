@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from gym_tracker.schemas import WhatsAppMessage
+from gym_tracker.services.normalization import explicit_equipment
 from gym_tracker.services.parser import (
     content_hash,
     parse_set_line,
@@ -123,6 +124,11 @@ def test_explicit_equipment_block_context_is_applied() -> None:
     outcome = parse_workout_message(split_whatsapp_messages(text)[0])
     assert outcome.extraction is not None
     assert outcome.extraction.exercises[0].equipment == "Máquina"
+
+
+@pytest.mark.parametrize("name", ["Bíceps hack", "Bíceps zottman", "Bíceps zootman"])
+def test_exercise_technique_names_are_not_explicit_equipment(name: str) -> None:
+    assert explicit_equipment(name) is None
 
 
 def test_unknown_exercise_goes_to_review() -> None:

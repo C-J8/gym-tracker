@@ -74,11 +74,11 @@ CATALOG_RULES: tuple[tuple[tuple[str, ...], ExerciseMatch], ...] = (
 
 def explicit_equipment(raw_name: str, context: str | None = None) -> str | None:
     key = normalize_text(f"{context or ''} {raw_name}")
-    if any(token in key for token in ("halter", "zootman", "zottman", "hack")):
+    if re.search(r"\bhalter(?:es)?\b", key):
         return "Halter"
-    if any(token in key for token in ("corda", "cabo", "triceps barra", "antebraco puxada", "antbraco puxada")):
+    if re.search(r"\b(?:corda|cabo)\b", key):
         return "Cabo"
-    if any(token in key for token in ("maquina", "maq")):
+    if re.search(r"\b(?:maquina|maq)\b", key):
         return "Máquina"
     return None
 
