@@ -23,6 +23,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql+psycopg://gym_tracker:gym_tracker@localhost:5432/gym_tracker_test
+      GYM_TRACKER_TEST_DATABASE_URL: postgresql+psycopg://gym_tracker:gym_tracker@localhost:5432/gym_tracker_test
       DATA_BACKEND: csv
       OPENAI_API_KEY: ""
     steps:

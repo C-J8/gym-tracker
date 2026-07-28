@@ -3,11 +3,12 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from gym_tracker.config import get_settings
-from gym_tracker.models import ParseMethod, ParseReview, ParseStatus, ReviewStatus
+from gym_tracker.models import ParseMethod, ParseResultStatus, ParseReview, ParseStatus, ReviewStatus
 from gym_tracker.repositories.catalog import get_or_create_exercise, save_alias
+from gym_tracker.repositories.state import bump_data_revision
 from gym_tracker.schemas import WorkoutExtraction
-from gym_tracker.services.whatsapp_import import _materialize_extraction
+from gym_tracker.services.normalization import normalize_text
+from gym_tracker.services.whatsapp_import import _activate_result, _materialize_extraction
 
 
 def accept_review(
@@ -23,19 +24,32 @@ def accept_review(
         raise ValueError("review ja finalizado")
     extraction = WorkoutExtraction.model_validate(corrected_payload)
     raw_message = review.raw_message
-    if raw_message.sets:
-        raise ValueError("a mensagem ja possui series materializadas")
-    user_id = raw_message.import_record.user_id
+    result = review.parse_result
+    if result.status != ParseResultStatus.REVIEW.value or result.sets:
+        raise ValueError("o resultado da revisao nao esta pendente ou ja possui series")
+    user_id = raw_message.user_id
     _materialize_extraction(
         session,
         user_id,
         raw_message,
+        result,
         extraction,
-        get_settings().parser_version,
+        result.parse_run.parser_version,
         parse_method=ParseMethod.MANUAL.value,
     )
+    result.parse_method = ParseMethod.MANUAL.value
+    result.payload = extraction.model_dump(mode="json")
+    result.reasons = []
+    _activate_result(session, result)
     if alias_raw and extraction.exercises:
-        payload = extraction.exercises[0]
+        matching = [
+            payload for payload in extraction.exercises if normalize_text(payload.raw_name) == normalize_text(alias_raw)
+        ]
+        if not matching and len(extraction.exercises) == 1:
+            matching = extraction.exercises
+        if len(matching) != 1:
+            raise ValueError("informe um alias que corresponda a exatamente um exercicio do payload")
+        payload = matching[0]
         if not payload.canonical_name or not payload.muscle_group:
             raise ValueError("nao e possivel salvar alias sem exercicio canonico e grupo")
         exercise = get_or_create_exercise(session, payload.canonical_name, payload.muscle_group)
@@ -44,6 +58,7 @@ def accept_review(
     review.status = ReviewStatus.ACCEPTED.value
     review.reviewed_at = datetime.now(UTC)
     raw_message.parse_status = ParseStatus.ACCEPTED.value
+    bump_data_revision(session)
     session.flush()
     return review
 
@@ -56,6 +71,9 @@ def reject_review(session: Session, review_id: uuid.UUID) -> ParseReview:
         raise ValueError("review ja finalizado")
     review.status = ReviewStatus.REJECTED.value
     review.reviewed_at = datetime.now(UTC)
-    review.raw_message.parse_status = ParseStatus.SKIPPED.value
+    review.parse_result.status = ParseResultStatus.REJECTED.value
+    if not any(result.is_active for result in review.raw_message.parse_results):
+        review.raw_message.parse_status = ParseStatus.SKIPPED.value
+    bump_data_revision(session)
     session.flush()
     return review

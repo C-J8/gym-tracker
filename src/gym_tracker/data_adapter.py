@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from gym_tracker.config import Settings, get_settings
 from gym_tracker.db import get_session_factory
 from gym_tracker.repositories.dashboard import DashboardRepository
+from gym_tracker.repositories.state import current_data_revision
 from gym_tracker.services.metrics import prepare_dashboard_dataframe
 
 
@@ -20,7 +21,13 @@ def data_signature(settings: Settings | None = None) -> str:
     if settings.data_backend == "csv":
         path = settings.legacy_csv_path
         return f"csv:{path}:{path.stat().st_mtime if path.exists() else 'missing'}"
-    return f"postgres:{os.getenv('GYM_TRACKER_DATA_VERSION', 'current')}"
+    try:
+        factory = get_session_factory(settings.database_url)
+        with factory() as session:
+            revision = current_data_revision(session)
+    except SQLAlchemyError:
+        revision = "unavailable"
+    return f"postgres:{revision}:{os.getenv('GYM_TRACKER_DATA_VERSION', '')}"
 
 
 def load_dashboard_data(

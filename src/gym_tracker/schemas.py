@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class SetPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    weight_kg: Decimal = Field(ge=0, le=1000)
+    weight_kg: Decimal = Field(ge=0, le=10000)
     reps: int = Field(ge=1, le=200)
     rpe: Decimal | None = Field(default=None, ge=0, le=10)
     rir: Decimal | None = Field(default=None, ge=0, le=20)
@@ -46,7 +46,9 @@ class WorkoutExtraction(BaseModel):
 
 class WhatsAppMessage(BaseModel):
     source_index: int = Field(ge=0)
+    source_offset: int = Field(default=0, ge=0)
     sent_at: datetime
+    timestamp_precision: str = Field(default="minute", pattern="^(minute|second)$")
     sender_raw: str
     raw_content: str
     content_sha256: str = Field(min_length=64, max_length=64)
@@ -68,8 +70,13 @@ class ParseOutcome(BaseModel):
 
 class QualityReport(BaseModel):
     import_id: str | None = None
+    parse_run_id: str | None = None
     duplicate_import: bool = False
+    reprocessed: bool = False
     messages_total: int = 0
+    messages_new: int = 0
+    messages_reused: int = 0
+    conflicting_messages: int = 0
     messages_accepted: int = 0
     messages_skipped: int = 0
     messages_pending_review: int = 0

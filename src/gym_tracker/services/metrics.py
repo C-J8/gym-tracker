@@ -26,7 +26,7 @@ def prepare_dashboard_dataframe(data: pd.DataFrame) -> pd.DataFrame:
     df["tipo"] = df["tipo"].replace(TYPE_LABELS)
     df["volume"] = df["peso_kg"] * df["repeticoes"]
     df["estimativa_1rm"] = estimate_epley_1rm(df["peso_kg"], df["repeticoes"])
-    df["semana"] = df["data"].dt.to_period("W-MON").dt.start_time
+    df["semana"] = df["data"].dt.to_period("W-SUN").dt.start_time
     df["mes"] = df["data"].dt.to_period("M").dt.to_timestamp()
     df["exercicio_tipo"] = df["exercicio"] + " - " + df["tipo"]
     return df

@@ -2,41 +2,58 @@
 
 ## Variáveis
 
-- `DATABASE_URL`: conexão SQLAlchemy, por padrão o PostgreSQL do Compose.
+- `DATABASE_URL`: conexão SQLAlchemy.
 - `DATA_BACKEND`: `postgres` ou `csv`.
-- `LEGACY_CSV_PATH`: caminho usado somente no modo CSV.
-- `GYM_TRACKER_USER_ID`: usuário exibido pelo app quando há múltiplos usuários.
-- `OPENAI_API_KEY`: opcional; sem ela, nenhuma chamada é tentada.
-- `OPENAI_MODEL`: modelo usado pelo extrator.
-- `LLM_SHADOW_MODE`: ligado por padrão.
-- `LLM_AUTO_ACCEPT`: desligado por padrão e ainda não materializa propostas.
-- `PARSER_VERSION`: versão registrada em imports e séries.
+- `GYM_TRACKER_USER_ID`: usuário mostrado no dashboard.
+- `OPENAI_API_KEY`: opcional.
+- `OPENAI_MODEL`: modelo auditado no parse run.
+- `LLM_SHADOW_MODE`: `true` por padrão.
+- `LLM_AUTO_ACCEPT`: `false` por padrão.
+- `PARSER_VERSION`: versão lógica do parser, atualmente `3.0.0`.
 
-## Regras do parser
+## Importação e reprocessamento
 
-O parser aceita números com ponto/vírgula, `kg`, o erro contextual `22.5g`, multiplicadores como `8rep/2x`, múltiplas cargas por linha e continuação iniciada por reticências. Observações entre parênteses viram notas.
+```bash
+uv run python -m gym_tracker.cli import-whatsapp --file export.txt --user UUID
+uv run python -m gym_tracker.cli import-whatsapp --file export.txt --user UUID --parser-version 3.1.0
+uv run python -m gym_tracker.cli quality-report --import-id UUID
+```
 
-Uma linha nomeada sem `kg`, como `Barra 14/10rep`, é interpretada isoladamente e enviada para revisão por unidade ausente. Ela nunca é anexada ao exercício anterior. Mensagens apagadas e mídia são preservadas como fonte e ignoradas como treino.
+O mesmo arquivo/versão retorna `duplicate_import=true`. Uma nova versão cria outro parse run. Em exports sobrepostos, a ocorrência é registrada no novo import e a mensagem anterior é reutilizada.
 
-## Revisão e aliases
+## Formatos do WhatsApp
 
-`list-reviews` mostra as pendências. Exporte ou escreva um JSON no contrato `WorkoutExtraction`, valide-o com `accept-review` e, quando útil, passe `--save-alias`. Em importações futuras o alias do usuário é consultado antes da LLM.
+São aceitos cabeçalhos com ano de dois ou quatro dígitos, segundos opcionais e estas formas:
 
-Rejeitar uma revisão não apaga a mensagem; apenas marca a decisão e mantém o histórico.
+```text
+[24/07/2026, 13:45:12] Nome: mensagem
+[24/07/2026 13:45] Nome: mensagem
+24/07/2026 13:45 - Nome: mensagem
+24/07/2026, 13:45:12 - Nome: mensagem
+```
 
-## Migração legada
+Mensagens multilinha e múltiplos exercícios são preservados. Só são juntadas linhas iniciadas por reticências ou continuações compostas claramente apenas por repetições. Texto livre separado vai para revisão. Marcadores de edição, exclusão e mídia ficam na origem.
 
-`compare-legacy` gera três arquivos ignorados pelo Git:
+## Revisões
 
-- `academia_treinos_reprocessado.csv`;
-- `pendencias_reprocessamento.json`;
-- `relatorio_qualidade.json`.
+```bash
+uv run python -m gym_tracker.cli list-reviews --status pending --json
+uv run python -m gym_tracker.cli show-review --review-id UUID --json
+uv run python -m gym_tracker.cli accept-review --review-id UUID --payload correcao.json
+uv run python -m gym_tracker.cli accept-review --review-id UUID --payload correcao.json --save-alias "mov x"
+uv run python -m gym_tracker.cli reject-review --review-id UUID
+```
 
-O CSV original não é sobrescrito. Somente mensagens aceitas são gravadas no arquivo reprocessado ou no PostgreSQL.
+A listagem mostra data, motivo, método, trecho limitado, proposta e status. O detalhe mostra conteúdo original, origem, payloads e resumo das diferenças. Aceitar ou rejeitar uma revisão finalizada novamente é erro. Aceitar materializa e ativa transacionalmente; rejeitar preserva qualquer resultado ativo anterior.
+
+## Comparação legada
+
+O comparador normaliza Unicode, acentos, caixa, espaços, equipamento e números. Diferenças apenas visuais não contam como alteração. Equipamentos ou séries realmente diferentes continuam aparecendo.
 
 ## Limitações
 
-- A UI de revisão ainda é CLI/JSON.
-- A associação de usuário é informada no comando; não há autenticação web.
-- Detecção de conflito temporal é conservadora e pode exigir revisão de séries legítimas repetidas no mesmo dia.
-- A LLM não decide automaticamente nesta versão.
+- revisão humana ainda usa CLI/JSON;
+- não há autenticação web;
+- correlação de exports com precisão temporal diferente é conservadora;
+- duas variantes históricas confirmadas tornam o equipamento ambíguo;
+- LLM autoaceita somente com duas configurações explícitas e continua sendo uma opção de alto controle.

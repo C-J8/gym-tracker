@@ -4,7 +4,7 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from gym_tracker.models import Exercise, ExerciseVariant, User, Workout, WorkoutSet
+from gym_tracker.models import Exercise, ExerciseVariant, ParseResult, User, Workout, WorkoutSet
 
 
 class DashboardRepository:
@@ -25,6 +25,8 @@ class DashboardRepository:
             .join(WorkoutSet.workout)
             .join(WorkoutSet.exercise_variant)
             .join(ExerciseVariant.exercise)
+            .join(WorkoutSet.parse_result)
+            .where(ParseResult.is_active.is_(True))
             .order_by(Workout.workout_date, Exercise.canonical_name, WorkoutSet.set_number)
         )
         if user_id is not None:

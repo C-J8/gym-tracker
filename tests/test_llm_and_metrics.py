@@ -71,3 +71,23 @@ def test_metrics_and_dashboard_adapter_types() -> None:
     assert prepared.iloc[0]["estimativa_1rm"] == pytest.approx(80)
     assert estimate_epley_1rm(60, 10) == pytest.approx(80)
     assert str(prepared["repeticoes"].dtype) == "Int64"
+
+
+def test_analytical_week_runs_from_monday_through_sunday() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "data": date,
+                "grupo_muscular": "Pernas",
+                "exercicio": "Extensora",
+                "tipo": "Máquina",
+                "peso_kg": 40,
+                "serie": 1,
+                "repeticoes": 10,
+            }
+            for date in ("2025-12-28", "2025-12-29", "2025-12-30", "2026-01-04", "2026-01-05")
+        ]
+    )
+    prepared = prepare_dashboard_dataframe(frame)
+    starts = prepared["semana"].dt.strftime("%Y-%m-%d").tolist()
+    assert starts == ["2025-12-22", "2025-12-29", "2025-12-29", "2025-12-29", "2026-01-05"]

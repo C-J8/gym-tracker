@@ -3,7 +3,8 @@ import uuid
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from gym_tracker.models import Exercise, ExerciseAlias, ExerciseVariant
+from gym_tracker.models import Exercise, ExerciseAlias, ExerciseVariant, ParseResult, RawMessage, WorkoutSet
+from gym_tracker.repositories.state import bump_data_revision
 from gym_tracker.services.normalization import ExerciseMatch, normalize_text
 
 
@@ -22,9 +23,30 @@ def find_alias(session: Session, raw_name: str, user_id: uuid.UUID) -> ExerciseM
     return ExerciseMatch(
         canonical_name=exercise.canonical_name,
         muscle_group=exercise.muscle_group,
-        equipment=alias.suggested_equipment or "Máquina",
+        equipment=alias.suggested_equipment,
         load_basis="por_halter" if alias.suggested_equipment == "Halter" else "total",
     )
+
+
+def find_confirmed_variant(
+    session: Session,
+    canonical_name: str,
+    user_id: uuid.UUID,
+) -> tuple[str, str] | None:
+    rows = session.execute(
+        select(ExerciseVariant.equipment, ExerciseVariant.load_basis)
+        .join(WorkoutSet, WorkoutSet.exercise_variant_id == ExerciseVariant.id)
+        .join(ParseResult, ParseResult.id == WorkoutSet.parse_result_id)
+        .join(RawMessage, RawMessage.id == ParseResult.raw_message_id)
+        .join(Exercise, Exercise.id == ExerciseVariant.exercise_id)
+        .where(
+            Exercise.canonical_name == canonical_name,
+            RawMessage.user_id == user_id,
+            ParseResult.is_active.is_(True),
+        )
+        .distinct()
+    ).all()
+    return rows[0] if len(rows) == 1 else None
 
 
 def get_or_create_exercise(session: Session, canonical_name: str, muscle_group: str) -> Exercise:
@@ -88,4 +110,5 @@ def save_alias(
         alias.exercise = exercise
         alias.suggested_equipment = equipment
     session.flush()
+    bump_data_revision(session)
     return alias

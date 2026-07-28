@@ -1,0 +1,42 @@
+[
+  {
+    "source_index": 0,
+    "timestamp": "2026-07-24T13:45:12-03:00",
+    "precision": "second",
+    "sender": "Pessoa A",
+    "edited": true,
+    "deleted": false,
+    "media": false,
+    "content": "Extensora 40kg/10rep\n... 45kg/8rep <Mensagem editada>"
+  },
+  {
+    "source_index": 1,
+    "timestamp": "2026-07-24T13:46:00-03:00",
+    "precision": "minute",
+    "sender": "Pessoa B",
+    "edited": false,
+    "deleted": false,
+    "media": false,
+    "content": "Flexora 30kg/8rep"
+  },
+  {
+    "source_index": 2,
+    "timestamp": "2026-07-24T13:47:00-03:00",
+    "precision": "minute",
+    "sender": "Pessoa C",
+    "edited": false,
+    "deleted": true,
+    "media": false,
+    "content": "Mensagem apagada"
+  },
+  {
+    "source_index": 3,
+    "timestamp": "2026-07-24T13:48:09-03:00",
+    "precision": "second",
+    "sender": "Pessoa D",
+    "edited": false,
+    "deleted": false,
+    "media": true,
+    "content": "<Mídia oculta>"
+  }
+]

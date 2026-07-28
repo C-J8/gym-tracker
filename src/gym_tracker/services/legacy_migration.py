@@ -4,6 +4,7 @@ from collections import Counter
 from pathlib import Path
 
 from gym_tracker.schemas import QualityReport
+from gym_tracker.services.normalization import normalize_equipment, normalize_text
 from gym_tracker.services.parser import parse_workout_message, split_whatsapp_messages
 from gym_tracker.services.validation import count_reasons, review_reasons
 from gym_tracker.services.whatsapp_import import _conflicting_message_indexes
@@ -99,5 +100,11 @@ def _row_key(row: dict) -> tuple[str, ...]:
         value = str(row.get(column, ""))
         if column == "peso_kg":
             value = f"{float(value):g}"
+        elif column in {"serie", "repeticoes"}:
+            value = str(int(float(value)))
+        elif column == "tipo":
+            value = normalize_equipment(value)
+        elif column in {"grupo_muscular", "exercicio"}:
+            value = normalize_text(value)
         values.append(value)
     return tuple(values)

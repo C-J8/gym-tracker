@@ -30,10 +30,12 @@ O dashboard abre em `http://localhost:8501`. Com mais de um usuário no banco, d
 uv run alembic upgrade head
 uv run python -m gym_tracker.cli db-upgrade
 uv run python -m gym_tracker.cli import-whatsapp --file export.txt --user UUID
+uv run python -m gym_tracker.cli import-whatsapp --file export.txt --user UUID --parser-version 3.1.0
 uv run python -m gym_tracker.cli import-legacy-csv --file academia_treinos_whatsapp.csv --user UUID
 uv run python -m gym_tracker.cli quality-report --import-id UUID
 uv run python -m gym_tracker.cli evaluate-parser --file export.txt
 uv run python -m gym_tracker.cli list-reviews --status pending
+uv run python -m gym_tracker.cli show-review --review-id UUID --json
 uv run python -m gym_tracker.cli accept-review --review-id UUID --payload correcao.json --save-alias "sup reto halter"
 uv run python -m gym_tracker.cli reject-review --review-id UUID
 ```
@@ -67,7 +69,7 @@ uv run pytest
 uv run alembic check
 ```
 
-O CI executa os mesmos passos com PostgreSQL. Testes usam fixtures anonimizadas e nunca chamam serviços externos.
+O CI executa os mesmos passos e também os testes de integração com PostgreSQL. Testes usam fixtures anonimizadas e nunca chamam serviços externos.
 
 ## Documentação
 
@@ -76,4 +78,6 @@ O CI executa os mesmos passos com PostgreSQL. Testes usam fixtures anonimizadas 
 - [Operação, parsing e revisão](docs/operations.md)
 - [Privacidade](docs/privacy.md)
 
-Limitações atuais: não há autenticação no Streamlit, a revisão humana ocorre por CLI/JSON e o extrator LLM permanece em shadow mode. O redesign visual está deliberadamente fora desta etapa.
+Exports sobrepostos reutilizam mensagens canônicas e registram suas ocorrências em cada arquivo. Reprocessamentos são separados por `PARSER_VERSION`, e somente o resultado aceito ativo alimenta o dashboard. Veja a documentação para identidade, equipamento, unidades, cache e shadow mode.
+
+Limitações atuais: não há autenticação no Streamlit e a revisão humana ocorre por CLI/JSON. O redesign visual está deliberadamente fora desta etapa.
