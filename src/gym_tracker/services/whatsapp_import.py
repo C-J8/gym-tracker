@@ -41,7 +41,13 @@ from gym_tracker.services.normalization import (
     normalize_text,
 )
 from gym_tracker.services.parser import normalized_set_signatures, parse_workout_message, split_whatsapp_messages
-from gym_tracker.services.validation import count_reasons, llm_auto_accept_blockers, review_reasons
+from gym_tracker.services.validation import (
+    count_reasons,
+    extraction_materialization_reasons,
+    llm_auto_accept_blockers,
+    llm_source_evidence_reasons,
+    review_reasons,
+)
 
 
 def sha256_bytes(content: bytes) -> str:
@@ -182,6 +188,13 @@ def _materialize_extraction(
     parse_method: str = ParseMethod.RULE.value,
     llm_model: str | None = None,
 ) -> int:
+    invariant_reasons = extraction_materialization_reasons(extraction)
+    if invariant_reasons:
+        raise ValueError(f"extracao nao materializavel: {'; '.join(invariant_reasons)}")
+    for exercise_payload in extraction.exercises:
+        if not exercise_payload.canonical_name or not exercise_payload.muscle_group or not exercise_payload.equipment:
+            raise ValueError(f"extracao incompleta para {exercise_payload.raw_name}")
+
     workout = Workout(
         user_id=user_id,
         workout_date=extraction.workout_date,
@@ -194,8 +207,6 @@ def _materialize_extraction(
     created = 0
     variant_set_counters: dict[uuid.UUID, int] = defaultdict(int)
     for exercise_payload in extraction.exercises:
-        if not exercise_payload.canonical_name or not exercise_payload.muscle_group or not exercise_payload.equipment:
-            raise ValueError(f"extracao incompleta para {exercise_payload.raw_name}")
         exercise = get_or_create_exercise(session, exercise_payload.canonical_name, exercise_payload.muscle_group)
         variant = get_or_create_variant(
             session,
@@ -223,6 +234,10 @@ def _materialize_extraction(
                 )
             )
             created += 1
+    if created == 0:
+        session.delete(workout)
+        session.flush()
+        raise ValueError("extracao materializada sem series")
     session.flush()
     return created
 
@@ -514,14 +529,24 @@ def import_whatsapp_file(
             except Exception as error:
                 reasons.append(f"falha no extrator LLM: {type(error).__name__}")
 
+        llm_review_reasons = (
+            review_reasons(ParseOutcome(extraction=llm_proposal, parse_method=ParseMethod.LLM.value))
+            if llm_proposal is not None
+            else []
+        )
+        source_evidence_reasons = (
+            llm_source_evidence_reasons(outcome.extraction, llm_proposal) if llm_proposal is not None else []
+        )
         can_auto_accept_llm = (
             llm_proposal is not None
             and not settings.llm_shadow_mode
             and settings.llm_auto_accept
             and not llm_auto_accept_blockers(reasons)
-            and not review_reasons(ParseOutcome(extraction=llm_proposal, parse_method=ParseMethod.LLM.value))
+            and not llm_review_reasons
+            and not source_evidence_reasons
         )
         if reasons and not can_auto_accept_llm:
+            reasons = list(dict.fromkeys([*reasons, *llm_review_reasons, *source_evidence_reasons]))
             result.status = ParseResultStatus.REVIEW.value
             result.reasons = reasons
             result.payload = _payload_for_review(outcome, llm_proposal, extractor)
