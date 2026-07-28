@@ -45,7 +45,7 @@ def _timestamp_key(value) -> str:
     parsed = _as_datetime(value)
     if hasattr(parsed, "tzinfo") and parsed.tzinfo is not None:
         parsed = parsed.astimezone(UTC)
-    return parsed.replace(second=0, microsecond=0).isoformat()
+    return f"minute:{parsed.replace(second=0, microsecond=0).isoformat()}"
 
 
 def _as_uuid(value) -> uuid.UUID:
@@ -89,28 +89,28 @@ def _backfill_and_group_messages(
     dialect_name: str,
 ) -> tuple[dict[uuid.UUID, uuid.UUID], dict[uuid.UUID, uuid.UUID | None]]:
     groups: dict[tuple[uuid.UUID, str], list[dict]] = defaultdict(list)
+    occurrence_counts: dict[tuple[object, ...], int] = defaultdict(int)
     for row in legacy_rows:
         sender = _normalized_sender(row["sender_raw"])
         normalized_content_hash = _sha256(_normalized_content(row["raw_content"]))
-        identity = _sha256(
-            "\n".join(
-                (
-                    str(row["user_id"]),
-                    sender,
-                    _timestamp_key(row["sent_at"]),
-                    normalized_content_hash,
-                    str(bool(row["is_edited"])),
-                    "0",
-                )
-            )
+        base_identity = (
+            str(row["user_id"]),
+            sender,
+            _timestamp_key(row["sent_at"]),
+            normalized_content_hash,
+            str(bool(row["is_edited"])),
         )
+        occurrence_key = (_as_uuid(row["import_id"]), *base_identity)
+        occurrence_ordinal = occurrence_counts[occurrence_key]
+        occurrence_counts[occurrence_key] += 1
+        identity = _sha256("\n".join((*base_identity, str(occurrence_ordinal))))
         row.update(
             {
                 "sender_normalized": sender,
                 "normalized_content_sha256": normalized_content_hash,
                 "identity_sha256": identity,
                 "timestamp_precision": "minute",
-                "occurrence_ordinal": 0,
+                "occurrence_ordinal": occurrence_ordinal,
             }
         )
         connection.execute(
@@ -123,7 +123,7 @@ def _backfill_and_group_messages(
                     sender_normalized = :sender_normalized,
                     normalized_content_sha256 = :normalized_content_sha256,
                     identity_sha256 = :identity_sha256,
-                    occurrence_ordinal = 0
+                    occurrence_ordinal = :occurrence_ordinal
                 WHERE id = :id
                 """
             ),
@@ -133,6 +133,7 @@ def _backfill_and_group_messages(
                 "sender_normalized": sender,
                 "normalized_content_sha256": normalized_content_hash,
                 "identity_sha256": identity,
+                "occurrence_ordinal": occurrence_ordinal,
             },
         )
         groups[(_as_uuid(row["user_id"]), identity)].append(row)
@@ -322,7 +323,7 @@ def upgrade() -> None:
             "raw_message_id": canonical_by_original[_as_uuid(row["id"])],
             "source_index": row["source_index"],
             "source_offset": 0,
-            "occurrence_ordinal": 0,
+            "occurrence_ordinal": row["occurrence_ordinal"],
             "timestamp_precision": "minute",
         }
         for row in legacy_rows

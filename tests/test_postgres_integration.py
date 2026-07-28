@@ -195,6 +195,179 @@ def _seed_overlapping_exports_at_0001(database_url: str) -> dict[str, uuid.UUID]
     return ids
 
 
+def _seed_repeated_occurrences_at_0001(database_url: str) -> dict[str, uuid.UUID]:
+    ids = {
+        name: uuid.uuid4()
+        for name in (
+            "user",
+            "import_a",
+            "import_b",
+            "exercise_old",
+            "exercise_new",
+            "variant_old",
+            "variant_new",
+            "review",
+        )
+    }
+    message_ids = [uuid.uuid4() for _ in range(5)]
+    workout_ids = [uuid.uuid4() for _ in range(5)]
+    set_ids = [uuid.uuid4() for _ in range(5)]
+    ids.update({f"message_{index}": value for index, value in enumerate(message_ids)})
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO users (id, display_name) VALUES (:id, 'Pessoa')"),
+            {"id": ids["user"]},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO imports
+                    (id, user_id, source_filename, source_sha256, parser_version, status, metadata)
+                VALUES
+                    (:a, :user_id, 'export-a.txt', :hash_a, 'v1', 'completed', CAST('{}' AS jsonb)),
+                    (:b, :user_id, 'export-b.txt', :hash_b, 'v1', 'completed', CAST('{}' AS jsonb))
+                """
+            ),
+            {
+                "a": ids["import_a"],
+                "b": ids["import_b"],
+                "user_id": ids["user"],
+                "hash_a": "1" * 64,
+                "hash_b": "2" * 64,
+            },
+        )
+        raw_rows = [
+            {
+                "id": message_ids[0],
+                "import_id": ids["import_a"],
+                "source_index": 0,
+                "sent_at": "2026-01-01 10:00:00-03",
+                "content": "Extensora 40kg/10rep",
+                "hash": "3" * 64,
+            },
+            {
+                "id": message_ids[1],
+                "import_id": ids["import_a"],
+                "source_index": 1,
+                "sent_at": "2026-01-01 10:00:00-03",
+                "content": "Extensora   40kg/10rep",
+                "hash": "4" * 64,
+            },
+            {
+                "id": message_ids[2],
+                "import_id": ids["import_b"],
+                "source_index": 0,
+                "sent_at": "2026-01-01 10:00:00-03",
+                "content": "Extensora 40kg/10rep",
+                "hash": "5" * 64,
+            },
+            {
+                "id": message_ids[3],
+                "import_id": ids["import_b"],
+                "source_index": 1,
+                "sent_at": "2026-01-01 10:00:00-03",
+                "content": "Extensora  40kg/10rep",
+                "hash": "6" * 64,
+            },
+            {
+                "id": message_ids[4],
+                "import_id": ids["import_b"],
+                "source_index": 2,
+                "sent_at": "2026-01-02 10:00:00-03",
+                "content": "Flexora 30kg/8rep",
+                "hash": "7" * 64,
+            },
+        ]
+        connection.execute(
+            text(
+                """
+                INSERT INTO raw_messages
+                    (id, import_id, source_index, sent_at, sender_raw, raw_content, content_sha256,
+                     is_edited, is_deleted, parse_status)
+                VALUES
+                    (:id, :import_id, :source_index, CAST(:sent_at AS timestamptz), 'Pessoa',
+                     :content, :hash, false, false, 'accepted')
+                """
+            ),
+            raw_rows,
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO exercises (id, canonical_name, muscle_group)
+                VALUES (:old, 'Extensora', 'Pernas'), (:new, 'Flexora', 'Pernas')
+                """
+            ),
+            {"old": ids["exercise_old"], "new": ids["exercise_new"]},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO exercise_variants (id, exercise_id, equipment, gym_or_location, load_basis)
+                VALUES
+                    (:old, :exercise_old, 'Máquina', '', 'total'),
+                    (:new, :exercise_new, 'Máquina', '', 'total')
+                """
+            ),
+            {
+                "old": ids["variant_old"],
+                "new": ids["variant_new"],
+                "exercise_old": ids["exercise_old"],
+                "exercise_new": ids["exercise_new"],
+            },
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO workouts (id, user_id, workout_date, source)
+                VALUES (:id, :user_id, CAST(:workout_date AS date), 'whatsapp')
+                """
+            ),
+            [
+                {
+                    "id": workout_ids[index],
+                    "user_id": ids["user"],
+                    "workout_date": "2026-01-02" if index == 4 else "2026-01-01",
+                }
+                for index in range(5)
+            ],
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO sets
+                    (id, workout_id, exercise_variant_id, raw_message_id, set_number, weight_kg,
+                     reps, parse_method, parser_version)
+                VALUES
+                    (:id, :workout_id, :variant_id, :raw_message_id, 1, :weight, :reps, 'rule', 'v1')
+                """
+            ),
+            [
+                {
+                    "id": set_ids[index],
+                    "workout_id": workout_ids[index],
+                    "variant_id": ids["variant_new"] if index == 4 else ids["variant_old"],
+                    "raw_message_id": message_ids[index],
+                    "weight": 30 if index == 4 else 40,
+                    "reps": 8 if index == 4 else 10,
+                }
+                for index in range(5)
+            ],
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO parse_reviews (id, raw_message_id, reason, status)
+                VALUES (:id, :raw_message_id, 'revisão legada', 'pending')
+                """
+            ),
+            {"id": ids["review"], "raw_message_id": message_ids[3]},
+        )
+    engine.dispose()
+    return ids
+
+
 def test_postgres_overlapping_exports_and_versioned_results(tmp_path: Path, monkeypatch) -> None:
     assert TEST_DATABASE_URL is not None
     _reset_test_database(TEST_DATABASE_URL)
@@ -267,6 +440,134 @@ def test_postgres_upgrade_and_downgrade_overlapping_0001_exports(monkeypatch) ->
         assert connection.scalar(text("SELECT count(*) FROM raw_messages")) == 2
         assert connection.scalar(text("SELECT count(*) FROM sets")) == 2
         assert connection.scalar(text("SELECT count(*) FROM parse_reviews")) == 1
+    engine.dispose()
+    get_settings.cache_clear()
+
+
+def test_postgres_migrates_repeated_occurrences_and_runtime_reuses_them(tmp_path: Path, monkeypatch) -> None:
+    assert TEST_DATABASE_URL is not None
+    _reset_test_database(TEST_DATABASE_URL)
+    _migrate(TEST_DATABASE_URL, "0001", monkeypatch)
+    ids = _seed_repeated_occurrences_at_0001(TEST_DATABASE_URL)
+
+    _migrate(TEST_DATABASE_URL, "head", monkeypatch)
+    engine = create_engine(TEST_DATABASE_URL)
+    with Session(engine) as session:
+        assert session.scalar(select(func.count()).select_from(Import)) == 2
+        assert session.scalar(select(func.count()).select_from(RawMessage)) == 3
+        assert session.scalar(select(func.count()).select_from(ImportMessageOccurrence)) == 5
+        assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 3
+        assert session.scalar(select(func.count()).select_from(ParseResult).where(ParseResult.is_active.is_(True))) == 3
+        assert len(DashboardRepository(session).workout_dataframe(ids["user"])) == 3
+        occurrences = list(
+            session.scalars(
+                select(ImportMessageOccurrence).order_by(
+                    ImportMessageOccurrence.import_id,
+                    ImportMessageOccurrence.source_index,
+                )
+            )
+        )
+        assert sorted(item.occurrence_ordinal for item in occurrences if item.source_index < 2) == [0, 0, 1, 1]
+        review_link = session.execute(
+            text("SELECT raw_message_id, parse_result_id FROM parse_reviews WHERE id = :id"),
+            {"id": ids["review"]},
+        ).one()
+        assert review_link.parse_result_id is not None
+
+        export_c = tmp_path / "export-c.txt"
+        export_c.write_text(
+            "01/01/2026 10:00 - Pessoa: Extensora 40kg/10rep\n"
+            "01/01/2026 10:00 - Pessoa: Extensora   40kg/10rep\n"
+            "02/01/2026 10:00 - Pessoa: Flexora 30kg/8rep",
+            encoding="utf-8",
+        )
+        report = import_whatsapp_file(session, export_c, ids["user"], settings=Settings(parser_version="v1"))
+        session.commit()
+        assert report.messages_new == 0
+        assert report.messages_reused == 3
+        assert session.scalar(select(func.count()).select_from(RawMessage)) == 3
+        assert session.scalar(select(func.count()).select_from(ImportMessageOccurrence)) == 8
+        assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 3
+    engine.dispose()
+
+    _downgrade(TEST_DATABASE_URL, "0001", monkeypatch)
+    engine = create_engine(TEST_DATABASE_URL)
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
+        assert connection.scalar(text("SELECT count(*) FROM raw_messages")) == 3
+        assert connection.scalar(text("SELECT count(*) FROM sets")) == 3
+    engine.dispose()
+    get_settings.cache_clear()
+
+
+def test_postgres_legacy_identity_remains_isolated_per_user(monkeypatch) -> None:
+    assert TEST_DATABASE_URL is not None
+    _reset_test_database(TEST_DATABASE_URL)
+    _migrate(TEST_DATABASE_URL, "0001", monkeypatch)
+    ids = _seed_overlapping_exports_at_0001(TEST_DATABASE_URL)
+    second = {name: uuid.uuid4() for name in ("user", "import", "raw", "workout", "set")}
+    engine = create_engine(TEST_DATABASE_URL)
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO users (id, display_name) VALUES (:id, 'Outra pessoa')"),
+            {"id": second["user"]},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO imports
+                    (id, user_id, source_filename, source_sha256, parser_version, status, metadata)
+                VALUES (:id, :user_id, 'other.txt', :hash, 'v1', 'completed', CAST('{}' AS jsonb))
+                """
+            ),
+            {"id": second["import"], "user_id": second["user"], "hash": "8" * 64},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO raw_messages
+                    (id, import_id, source_index, sent_at, sender_raw, raw_content, content_sha256,
+                     is_edited, is_deleted, parse_status)
+                VALUES (:id, :import_id, 0, '2026-01-01 10:00:00-03', 'Pessoa',
+                        'Extensora 40kg/10rep', :hash, false, false, 'accepted')
+                """
+            ),
+            {"id": second["raw"], "import_id": second["import"], "hash": "9" * 64},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO workouts (id, user_id, workout_date, source)
+                VALUES (:id, :user_id, '2026-01-01', 'whatsapp')
+                """
+            ),
+            {"id": second["workout"], "user_id": second["user"]},
+        )
+        connection.execute(
+            text(
+                """
+                INSERT INTO sets
+                    (id, workout_id, exercise_variant_id, raw_message_id, set_number, weight_kg,
+                     reps, parse_method, parser_version)
+                VALUES (:id, :workout_id, :variant_id, :raw_id, 1, 40, 10, 'rule', 'v1')
+                """
+            ),
+            {
+                "id": second["set"],
+                "workout_id": second["workout"],
+                "variant_id": ids["variant_old"],
+                "raw_id": second["raw"],
+            },
+        )
+    engine.dispose()
+
+    _migrate(TEST_DATABASE_URL, "head", monkeypatch)
+    engine = create_engine(TEST_DATABASE_URL)
+    with Session(engine) as session:
+        messages = list(session.scalars(select(RawMessage).where(RawMessage.raw_content == "Extensora 40kg/10rep")))
+        assert len(messages) == 2
+        assert {item.user_id for item in messages} == {ids["user"], second["user"]}
+        assert session.scalar(select(func.count()).select_from(ParseResult).where(ParseResult.is_active.is_(True))) == 3
     engine.dispose()
     get_settings.cache_clear()
 
