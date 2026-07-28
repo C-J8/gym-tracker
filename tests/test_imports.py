@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -16,6 +18,7 @@ from gym_tracker.models import (
     ParseRun,
     RawMessage,
     User,
+    Workout,
     WorkoutSet,
 )
 from gym_tracker.repositories.catalog import get_or_create_exercise, save_alias
@@ -25,7 +28,12 @@ from gym_tracker.schemas import ExercisePayload, SetPayload, WorkoutExtraction
 from gym_tracker.services.llm_extractor import MockWorkoutExtractor
 from gym_tracker.services.parser import parse_workout_message, split_whatsapp_messages
 from gym_tracker.services.reviews import accept_review, reject_review
-from gym_tracker.services.whatsapp_import import _conflicting_message_indexes, import_whatsapp_file
+from gym_tracker.services.validation import ReviewReasonKind, classify_review_reason, llm_auto_accept_blockers
+from gym_tracker.services.whatsapp_import import (
+    _conflicting_message_indexes,
+    _materialize_extraction,
+    import_whatsapp_file,
+)
 
 FIXTURE = Path("tests/fixtures/whatsapp_anonymized.txt")
 
@@ -43,6 +51,28 @@ def settings(version: str = "test", **overrides) -> Settings:
 def write_export(path: Path, *messages: str) -> Path:
     path.write_text("\n".join(messages), encoding="utf-8")
     return path
+
+
+def complete_proposal(
+    raw_name: str = "Extensora",
+    canonical_name: str = "Extensora",
+    muscle_group: str = "Pernas",
+    equipment: str = "Máquina",
+    weight_kg: int = 40,
+    reps: int = 10,
+) -> WorkoutExtraction:
+    return WorkoutExtraction(
+        workout_date="2026-01-01",
+        exercises=[
+            ExercisePayload(
+                raw_name=raw_name,
+                canonical_name=canonical_name,
+                muscle_group=muscle_group,
+                equipment=equipment,
+                sets=[SetPayload(weight_kg=weight_kg, reps=reps)],
+            )
+        ],
+    )
 
 
 def test_same_file_and_version_is_an_explicit_noop(session: Session, user: User) -> None:
@@ -473,7 +503,294 @@ def test_llm_requires_explicit_non_shadow_auto_accept(session: Session, user: Us
         extractor=extractor,
     )
     assert report.sets_accepted == 1
+    assert report.messages_accepted == 1
+    assert session.scalar(select(func.count()).select_from(Workout)) == 1
     assert session.scalar(select(func.count()).select_from(ParseReview)) == 0
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_reason"),
+    [
+        ("Extensora 40/10rep", "carga sem unidade"),
+        ("Extensora 40kg", "repeticoes ausentes"),
+    ],
+    ids=["missing-load-unit", "missing-repetitions"],
+)
+def test_llm_cannot_fill_mandatory_facts_missing_from_source(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+    message: str,
+    expected_reason: str,
+) -> None:
+    source = write_export(tmp_path / f"{expected_reason}.txt", f"01/01/2026 10:00 - Pessoa: {message}")
+    proposal = complete_proposal()
+    extractor = MockWorkoutExtractor(result=proposal)
+
+    report = import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings(llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=extractor,
+    )
+    review = session.scalar(select(ParseReview))
+
+    assert report.messages_accepted == 0
+    assert report.messages_pending_review == 1
+    assert report.sets_accepted == 0
+    assert session.scalar(select(func.count()).select_from(Workout)) == 0
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 0
+    assert session.scalar(select(func.count()).select_from(ParseReview)) == 1
+    assert review is not None and expected_reason in review.reason
+    assert review.proposed_payload["llm"] == proposal.model_dump(mode="json")
+    assert extractor.calls == 1
+
+
+def test_unclassified_review_reason_blocks_llm_auto_acceptance() -> None:
+    reason = "novo motivo ainda sem classificacao"
+
+    assert classify_review_reason(reason) == ReviewReasonKind.UNKNOWN
+    assert llm_auto_accept_blockers([reason]) == [reason]
+
+
+def test_llm_semantic_normalization_cannot_change_explicit_set_values(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    source = write_export(tmp_path / "changed-values.txt", "01/01/2026 10:00 - Pessoa: Mov X 10kg/10rep")
+    proposal = complete_proposal(
+        raw_name="Mov X",
+        canonical_name="Rosca X",
+        muscle_group="Bíceps",
+        equipment="Halter",
+        weight_kg=12,
+        reps=8,
+    )
+
+    report = import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings(llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=MockWorkoutExtractor(result=proposal),
+    )
+    review = session.scalar(select(ParseReview))
+
+    assert report.messages_accepted == 0
+    assert report.messages_pending_review == 1
+    assert session.scalar(select(func.count()).select_from(Workout)) == 0
+    assert review is not None and "proposta diverge dos valores da origem" in review.reason
+
+
+def test_incomplete_exercise_blocks_entire_multi_exercise_message(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    source = write_export(
+        tmp_path / "mixed-source.txt",
+        "01/01/2026 10:00 - Pessoa: Extensora 40kg/10rep\nFlexora 30kg",
+    )
+    proposal = WorkoutExtraction(
+        workout_date="2026-01-01",
+        exercises=[
+            ExercisePayload(
+                raw_name="Extensora",
+                canonical_name="Extensora",
+                muscle_group="Pernas",
+                equipment="Máquina",
+                sets=[SetPayload(weight_kg=40, reps=10)],
+            ),
+            ExercisePayload(
+                raw_name="Flexora",
+                canonical_name="Flexora",
+                muscle_group="Pernas",
+                equipment="Máquina",
+                sets=[SetPayload(weight_kg=30, reps=8)],
+            ),
+        ],
+    )
+
+    report = import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings(llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=MockWorkoutExtractor(result=proposal),
+    )
+    review = session.scalar(select(ParseReview))
+
+    assert report.messages_accepted == 0
+    assert report.messages_pending_review == 1
+    assert session.scalar(select(func.count()).select_from(Workout)) == 0
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 0
+    assert review is not None and "repeticoes ausentes" in review.reason
+    assert len(review.proposed_payload["llm"]["exercises"]) == 2
+
+
+def test_empty_llm_extraction_goes_to_review_without_empty_workout(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    source = write_export(tmp_path / "empty-llm.txt", "01/01/2026 10:00 - Pessoa: Mov X")
+    proposal = WorkoutExtraction(workout_date="2026-01-01", exercises=[])
+    extractor = MockWorkoutExtractor(result=proposal)
+
+    report = import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings(llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=extractor,
+    )
+    review = session.scalar(select(ParseReview))
+
+    assert report.messages_accepted == 0
+    assert report.messages_pending_review == 1
+    assert report.sets_accepted == 0
+    assert session.scalar(select(func.count()).select_from(Workout)) == 0
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 0
+    assert session.scalar(select(func.count()).select_from(ParseReview)) == 1
+    assert review is not None
+    assert review.proposed_payload["llm"]["exercises"] == []
+    assert "proposta sem exercicios" in review.reason
+    assert extractor.calls == 1
+
+
+@pytest.mark.parametrize(
+    "proposal",
+    [
+        WorkoutExtraction.model_construct(
+            workout_date=date(2026, 1, 1),
+            exercises=[
+                ExercisePayload.model_construct(
+                    raw_name="Extensora",
+                    canonical_name="Extensora",
+                    muscle_group="Pernas",
+                    equipment="Máquina",
+                    sets=[],
+                )
+            ],
+        ),
+        WorkoutExtraction.model_construct(
+            workout_date=date(2026, 1, 1),
+            exercises=[
+                complete_proposal().exercises[0],
+                ExercisePayload.model_construct(
+                    raw_name="Flexora",
+                    canonical_name="Flexora",
+                    muscle_group="Pernas",
+                    equipment="Máquina",
+                    sets=[],
+                ),
+            ],
+        ),
+        WorkoutExtraction.model_construct(
+            workout_date=date(2026, 1, 1),
+            exercises=[
+                ExercisePayload.model_construct(
+                    raw_name="Extensora",
+                    canonical_name="Extensora",
+                    muscle_group="Pernas",
+                    equipment="Máquina",
+                    sets=[
+                        SetPayload.model_construct(
+                            weight_kg=Decimal("0.05"),
+                            reps=10,
+                            rpe=None,
+                            rir=None,
+                        )
+                    ],
+                )
+            ],
+        ),
+    ],
+    ids=["exercise-without-sets", "valid-and-empty-exercises", "no-materializable-sets"],
+)
+def test_nonmaterializable_llm_extraction_blocks_entire_message(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+    proposal: WorkoutExtraction,
+) -> None:
+    source = write_export(tmp_path / "invalid-llm.txt", "01/01/2026 10:00 - Pessoa: Mov X 10kg/10rep")
+
+    report = import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings(llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=MockWorkoutExtractor(result=proposal),
+    )
+    review = session.scalar(select(ParseReview))
+
+    assert report.messages_accepted == 0
+    assert report.messages_pending_review == 1
+    assert session.scalar(select(func.count()).select_from(Workout)) == 0
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 0
+    assert review is not None and review.proposed_payload["llm"]["exercises"]
+
+
+def test_empty_llm_reprocessing_keeps_previous_accepted_result_active(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    exercise = get_or_create_exercise(session, "Rosca X", "Bíceps")
+    alias = save_alias(session, "mov x", exercise, "Halter", user.id)
+    session.commit()
+    source = write_export(tmp_path / "empty-reprocessing.txt", "01/01/2026 10:00 - Pessoa: Mov X 10kg/10rep")
+    first = import_whatsapp_file(session, source, user.id, settings=settings("v1"))
+    session.commit()
+    session.delete(session.get(ExerciseAlias, alias.id))
+    session.commit()
+    proposal = WorkoutExtraction(workout_date="2026-01-01", exercises=[])
+
+    second = import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings("v2", llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=MockWorkoutExtractor(result=proposal),
+    )
+    active_result = session.scalar(select(ParseResult).where(ParseResult.is_active.is_(True)))
+    review = session.scalar(select(ParseReview))
+
+    assert first.messages_accepted == 1
+    assert second.messages_accepted == 0
+    assert second.messages_pending_review == 1
+    assert session.scalar(select(func.count()).select_from(Workout)) == 1
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 1
+    assert active_result is not None and active_result.parse_run.parser_version == "v1"
+    assert review is not None and review.proposed_payload["llm"]["exercises"] == []
+
+
+def test_direct_materialization_rejects_empty_extraction_before_creating_workout(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    source = write_export(tmp_path / "direct-empty.txt", "01/01/2026 10:00 - Pessoa: Mov X")
+    proposal = WorkoutExtraction(workout_date="2026-01-01", exercises=[])
+    import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings(llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=MockWorkoutExtractor(result=proposal),
+    )
+    raw_message = session.scalar(select(RawMessage))
+    result = session.scalar(select(ParseResult))
+    assert raw_message is not None and result is not None
+
+    with pytest.raises(ValueError, match="proposta sem exercicios"):
+        _materialize_extraction(session, user.id, raw_message, result, proposal, "test")
+
+    assert session.scalar(select(func.count()).select_from(Workout)) == 0
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 0
 
 
 def test_non_shadow_without_auto_accept_still_requires_review(
