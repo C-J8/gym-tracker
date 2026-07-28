@@ -41,7 +41,7 @@ from gym_tracker.services.normalization import (
     normalize_text,
 )
 from gym_tracker.services.parser import normalized_set_signatures, parse_workout_message, split_whatsapp_messages
-from gym_tracker.services.validation import count_reasons, review_reasons
+from gym_tracker.services.validation import count_reasons, llm_auto_accept_blockers, review_reasons
 
 
 def sha256_bytes(content: bytes) -> str:
@@ -518,6 +518,7 @@ def import_whatsapp_file(
             llm_proposal is not None
             and not settings.llm_shadow_mode
             and settings.llm_auto_accept
+            and not llm_auto_accept_blockers(reasons)
             and not review_reasons(ParseOutcome(extraction=llm_proposal, parse_method=ParseMethod.LLM.value))
         )
         if reasons and not can_auto_accept_llm:

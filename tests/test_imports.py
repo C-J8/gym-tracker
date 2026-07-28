@@ -288,6 +288,82 @@ def test_explicit_equipment_overrides_user_alias(
     assert variant is not None and variant.equipment == "Máquina"
 
 
+@pytest.mark.parametrize("raw_name", ["Bíceps hack", "Bíceps zottman"])
+def test_alias_overrides_catalog_halter_default(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+    raw_name: str,
+) -> None:
+    exercise = get_or_create_exercise(session, raw_name, "Bíceps")
+    save_alias(session, raw_name, exercise, "Cabo", user.id)
+    session.commit()
+    source = write_export(
+        tmp_path / f"{raw_name}.txt",
+        f"01/01/2026 10:00 - Pessoa: {raw_name} 10kg/10rep ... 12kg/8rep",
+    )
+
+    report = import_whatsapp_file(session, source, user.id, settings=settings())
+    variants = list(
+        session.scalars(
+            select(ExerciseVariant).join(WorkoutSet, WorkoutSet.exercise_variant_id == ExerciseVariant.id).distinct()
+        )
+    )
+
+    assert report.sets_accepted == 2
+    assert [item.equipment for item in variants] == ["Cabo"]
+
+
+@pytest.mark.parametrize(
+    ("suffix", "expected"),
+    [("com halter", "Halter"), ("na máquina", "Máquina")],
+)
+def test_equipment_written_with_technique_name_overrides_alias(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+    suffix: str,
+    expected: str,
+) -> None:
+    exercise = get_or_create_exercise(session, "Bíceps hack", "Bíceps")
+    save_alias(session, "bíceps hack", exercise, "Cabo", user.id)
+    session.commit()
+    source = write_export(
+        tmp_path / f"explicit-{expected}.txt",
+        f"01/01/2026 10:00 - Pessoa: Bíceps hack {suffix} 10kg/10rep",
+    )
+
+    report = import_whatsapp_file(session, source, user.id, settings=settings())
+    variant = session.scalar(
+        select(ExerciseVariant).join(WorkoutSet, WorkoutSet.exercise_variant_id == ExerciseVariant.id)
+    )
+
+    assert report.sets_accepted == 1
+    assert variant is not None and variant.equipment == expected
+
+
+def test_alias_overrides_block_context_for_technique_name(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    exercise = get_or_create_exercise(session, "Bíceps hack", "Bíceps")
+    save_alias(session, "bíceps hack", exercise, "Cabo", user.id)
+    session.commit()
+    source = write_export(
+        tmp_path / "alias-context.txt",
+        "01/01/2026 10:00 - Pessoa: Máquina\nBíceps hack 10kg/10rep",
+    )
+
+    report = import_whatsapp_file(session, source, user.id, settings=settings())
+    variant = session.scalar(
+        select(ExerciseVariant).join(WorkoutSet, WorkoutSet.exercise_variant_id == ExerciseVariant.id)
+    )
+
+    assert report.sets_accepted == 1
+    assert variant is not None and variant.equipment == "Cabo"
+
+
 def test_explicit_block_context_is_used_after_alias_lookup(
     session: Session,
     user: User,
@@ -478,6 +554,88 @@ def test_uncertain_llm_proposal_never_replaces_previous_active_result(
     assert review.proposed_payload["llm"]["needs_review"] is True
     assert review.proposed_payload["llm"]["exercises"][0]["uncertain_fields"] == ["equipment"]
     assert active_result is not None and active_result.parse_run.parser_version == "v1"
+
+
+def test_valid_llm_proposal_cannot_override_source_identity_conflict(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    original = write_export(tmp_path / "llm-original.txt", "01/01/2026 10:00 - Pessoa: Extensora 40kg/10rep")
+    changed = write_export(tmp_path / "llm-changed.txt", "01/01/2026 10:00:00 - Pessoa: Extensora 45kg/8rep")
+    import_whatsapp_file(session, original, user.id, settings=settings("v1"))
+    session.commit()
+    proposal = WorkoutExtraction(
+        workout_date="2026-01-01",
+        exercises=[
+            ExercisePayload(
+                raw_name="Extensora",
+                canonical_name="Extensora",
+                muscle_group="Pernas",
+                equipment="Máquina",
+                sets=[SetPayload(weight_kg=45, reps=8)],
+            )
+        ],
+    )
+
+    report = import_whatsapp_file(
+        session,
+        changed,
+        user.id,
+        settings=settings("v2", llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=MockWorkoutExtractor(result=proposal),
+    )
+    review = session.scalar(select(ParseReview))
+    active_result = session.scalar(select(ParseResult).where(ParseResult.is_active.is_(True)))
+
+    assert report.conflicting_messages == 1
+    assert report.sets_accepted == 0
+    assert report.messages_pending_review == 1
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 1
+    assert len(DashboardRepository(session).workout_dataframe(user.id)) == 1
+    assert review is not None and "possivel edicao" in review.reason
+    assert review.proposed_payload["llm"]["exercises"][0]["equipment"] == "Máquina"
+    assert active_result is not None and active_result.parse_run.parser_version == "v1"
+
+
+def test_valid_llm_proposal_cannot_override_normalized_temporal_conflict(
+    session: Session,
+    user: User,
+    tmp_path: Path,
+) -> None:
+    source = write_export(
+        tmp_path / "normalized-conflict.txt",
+        "01/01/2026 10:00 - Pessoa: Extensora 40kg/10rep\nFlexora 30kg/8rep",
+        "01/01/2026 10:10 - Pessoa: Extensora 40kg/10rep\nFlexora 30kg/8rep",
+    )
+    proposal = WorkoutExtraction(
+        workout_date="2026-01-01",
+        exercises=[
+            ExercisePayload(
+                raw_name="Extensora",
+                canonical_name="Extensora",
+                muscle_group="Pernas",
+                equipment="Máquina",
+                sets=[SetPayload(weight_kg=40, reps=10)],
+            )
+        ],
+    )
+
+    report = import_whatsapp_file(
+        session,
+        source,
+        user.id,
+        settings=settings(llm_shadow_mode=False, llm_auto_accept=True),
+        extractor=MockWorkoutExtractor(result=proposal),
+    )
+    reviews = list(session.scalars(select(ParseReview)))
+
+    assert report.normalized_duplicates == 2
+    assert report.sets_accepted == 0
+    assert report.messages_pending_review == 2
+    assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 0
+    assert len(reviews) == 2
+    assert all("duplicacao normalizada ou conflito temporal" in item.reason for item in reviews)
 
 
 def test_accept_and_reject_review_are_single_use(session: Session, user: User, tmp_path: Path) -> None:

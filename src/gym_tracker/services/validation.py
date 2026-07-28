@@ -1,7 +1,49 @@
+import enum
 from collections import Counter
 
 from gym_tracker.schemas import ParseOutcome
 from gym_tracker.services.loads import MAX_PLAUSIBLE_LOAD_KG, MIN_PLAUSIBLE_LOAD_KG
+
+
+class ReviewReasonKind(enum.StrEnum):
+    SEMANTIC = "semantic"
+    SOURCE_INTEGRITY = "source_integrity"
+    HUMAN_JUDGMENT = "human_judgment"
+
+
+SOURCE_INTEGRITY_PREFIXES = (
+    "possivel edicao",
+    "duplicacao normalizada",
+    "conflito temporal",
+    "conflito de conteudo",
+    "identidade ambigua",
+)
+HUMAN_JUDGMENT_PREFIXES = (
+    "carga invalida",
+    "carga deve",
+    "carga acima",
+    "carga abaixo",
+    "carga fora",
+    "possivel erro de unidade",
+    "repeticoes fora",
+)
+
+
+def classify_review_reason(reason: str) -> ReviewReasonKind:
+    normalized = reason.casefold().strip()
+    if normalized.startswith(SOURCE_INTEGRITY_PREFIXES):
+        return ReviewReasonKind.SOURCE_INTEGRITY
+    if normalized.startswith(HUMAN_JUDGMENT_PREFIXES):
+        return ReviewReasonKind.HUMAN_JUDGMENT
+    return ReviewReasonKind.SEMANTIC
+
+
+def llm_auto_accept_blockers(reasons: list[str]) -> list[str]:
+    return [
+        reason
+        for reason in reasons
+        if classify_review_reason(reason) in {ReviewReasonKind.SOURCE_INTEGRITY, ReviewReasonKind.HUMAN_JUDGMENT}
+    ]
 
 
 def review_reasons(outcome: ParseOutcome, known_alias: bool = True) -> list[str]:
