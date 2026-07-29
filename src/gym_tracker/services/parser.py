@@ -1,26 +1,34 @@
 import hashlib
 import re
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from gym_tracker.schemas import ExercisePayload, ParseOutcome, SetPayload, WhatsAppMessage, WorkoutExtraction
+from gym_tracker.services.loads import parse_load
 from gym_tracker.services.normalization import (
-    ExerciseMatch,
-    adjust_equipment_for_load,
+    normalize_equipment,
     normalize_text,
     resolve_static_exercise,
 )
 
 WHATSAPP_HEADER = re.compile(
-    r"(?m)^(?:\[)?(?P<date>\d{1,2}/\d{1,2}/\d{2,4})[ ,]+(?P<time>\d{1,2}:\d{2})(?:\])?\s*-\s*(?P<head>.*)$"
+    r"(?mx)^"
+    r"(?:"
+    r"\[(?P<bracket_date>\d{1,2}/\d{1,2}/\d{2,4})[ ,]+"
+    r"(?P<bracket_time>\d{1,2}:\d{2}(?::\d{2})?)\]\s*(?:-\s*)?"
+    r"|"
+    r"(?P<plain_date>\d{1,2}/\d{1,2}/\d{2,4})[ ,]+"
+    r"(?P<plain_time>\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*"
+    r")"
+    r"(?P<head>.*)$"
 )
-LOAD_PATTERN = re.compile(r"(?P<load>\d+(?:[.,]\d+)?)\s*(?P<unit>kg|g)\b", re.IGNORECASE)
+LOAD_PATTERN = re.compile(r"(?<!\w)(?P<load>-?\d+(?:[.,]\d+)?)\s*(?P<unit>kg|g)\b", re.IGNORECASE)
 NAMELESS_LOAD_PATTERN = re.compile(
     r"^(?P<name>[^\d]{2,}?)\s+(?P<load>\d+(?:[.,]\d+)?)\s*[/|-]\s*(?P<rest>.*(?:rep|\d\s*x).*)$",
     re.IGNORECASE,
 )
-WORKOUT_TITLES = {"acad nova", "upper", "lower a", "lower b", "abd"}
+WORKOUT_TITLES = {"acad nova", "upper", "lower a", "lower b", "abd", "halter", "maquina", "cabo"}
 EDIT_MARKERS = ("<mensagem editada>", "(editada)")
 MEDIA_MARKERS = ("<midia oculta>", "<media omitted>")
 
@@ -31,29 +39,35 @@ def content_hash(sent_at: datetime, sender: str, content: str) -> str:
 
 
 def split_whatsapp_messages(text: str, timezone: str = "America/Sao_Paulo") -> list[WhatsAppMessage]:
-    matches = list(WHATSAPP_HEADER.finditer(text.replace("\ufeff", "")))
+    clean_text = text.replace("\ufeff", "")
+    matches = list(WHATSAPP_HEADER.finditer(clean_text))
     messages: list[WhatsAppMessage] = []
     zone = ZoneInfo(timezone)
 
     for source_index, match in enumerate(matches):
         body_start = match.end()
-        body_end = matches[source_index + 1].start() if source_index + 1 < len(matches) else len(text)
+        body_end = matches[source_index + 1].start() if source_index + 1 < len(matches) else len(clean_text)
         head = match.group("head")
         sender, separator, first_line = head.partition(": ")
         if not separator:
             sender, first_line = "", head
-        continuation = text[body_start:body_end].strip("\r\n")
+        continuation = clean_text[body_start:body_end].strip("\r\n")
         raw_content = first_line + (f"\n{continuation}" if continuation else "")
         raw_content = raw_content.strip()
         normalized = normalize_text(raw_content)
-        year_format = "%Y" if len(match.group("date").rsplit("/", 1)[-1]) == 4 else "%y"
-        sent_at = datetime.strptime(
-            f"{match.group('date')} {match.group('time')}", f"%d/%m/{year_format} %H:%M"
-        ).replace(tzinfo=zone)
+        date_text = match.group("bracket_date") or match.group("plain_date")
+        time_text = match.group("bracket_time") or match.group("plain_time")
+        year_format = "%Y" if len(date_text.rsplit("/", 1)[-1]) == 4 else "%y"
+        time_format = "%H:%M:%S" if time_text.count(":") == 2 else "%H:%M"
+        sent_at = datetime.strptime(f"{date_text} {time_text}", f"%d/%m/{year_format} {time_format}").replace(
+            tzinfo=zone
+        )
         messages.append(
             WhatsAppMessage(
                 source_index=source_index,
+                source_offset=match.start(),
                 sent_at=sent_at,
+                timestamp_precision="second" if time_text.count(":") == 2 else "minute",
                 sender_raw=sender.strip("\u200e "),
                 raw_content=raw_content,
                 content_sha256=content_hash(sent_at, sender, raw_content),
@@ -114,16 +128,12 @@ def _expand_repetitions(segment: str) -> list[int]:
     return reps
 
 
-def _normalize_load_typos(line: str) -> str:
-    return re.sub(r"(\d+(?:[.,]\d+)?)\s*g(?=\s*(?:[/.-]|rep|$))", r"\1kg", line, flags=re.IGNORECASE)
-
-
 def parse_set_line(line: str) -> tuple[str, list[SetPayload], list[str]]:
     normalized = normalize_text(line)
     if "n fiz" in normalized or "nao fiz" in normalized:
         return "", [], []
 
-    cleaned = re.sub(r"\([^)]*\)", "", _normalize_load_typos(line))
+    cleaned = re.sub(r"\([^)]*\)", "", line)
     load_matches = list(LOAD_PATTERN.finditer(cleaned))
     reasons: list[str] = []
 
@@ -159,14 +169,14 @@ def parse_set_line(line: str) -> tuple[str, list[SetPayload], list[str]]:
     for index, load_match in enumerate(load_matches):
         segment_end = load_matches[index + 1].start() if index + 1 < len(load_matches) else len(cleaned)
         segment = cleaned[load_match.end() : segment_end]
-        try:
-            load = Decimal(load_match.group("load").replace(",", "."))
-        except InvalidOperation:
-            reasons.append("carga invalida")
+        parsed_load = parse_load(load_match.group("load"), load_match.group("unit"))
+        reasons.extend(parsed_load.reasons)
+        if parsed_load.weight_kg is None or parsed_load.weight_kg < 0:
             continue
+        load = parsed_load.weight_kg
         reps = _expand_repetitions(segment)
         if not reps:
-            reasons.append(f"repeticoes ausentes para {load} kg")
+            reasons.append(f"repeticoes ausentes para {load:g} kg")
             continue
         parsed_sets.extend(SetPayload(weight_kg=load, reps=rep) for rep in reps)
     return raw_name, parsed_sets, reasons
@@ -206,24 +216,22 @@ def parse_workout_message(message: WhatsAppMessage) -> ParseOutcome:
             consumed.append(line)
             continue
 
-        uncertain_fields = ["weight_kg"] if "carga sem unidade" in line_reasons else []
-        sets_by_variant: dict[ExerciseMatch, list[SetPayload]] = {}
-        for item in sets:
-            adjusted_match = adjust_equipment_for_load(match, raw_name, [item.weight_kg])
-            sets_by_variant.setdefault(adjusted_match, []).append(item)
-        for adjusted_match, variant_sets in sets_by_variant.items():
-            exercises.append(
-                ExercisePayload(
-                    raw_name=raw_name,
-                    canonical_name=adjusted_match.canonical_name,
-                    muscle_group=adjusted_match.muscle_group,
-                    equipment=adjusted_match.equipment,
-                    load_basis=adjusted_match.load_basis,
-                    sets=variant_sets,
-                    uncertain_fields=uncertain_fields,
-                    needs_review=bool(line_reasons),
-                )
+        uncertain_fields = ["weight_kg"] if line_reasons else []
+        if match.equipment is None:
+            uncertain_fields.append("equipment")
+            line_reasons.append(f"equipamento nao determinado: {raw_name}")
+        exercises.append(
+            ExercisePayload(
+                raw_name=raw_name,
+                canonical_name=match.canonical_name,
+                muscle_group=match.muscle_group,
+                equipment=match.equipment,
+                load_basis=match.load_basis,
+                sets=sets,
+                uncertain_fields=uncertain_fields,
+                needs_review=bool(line_reasons),
             )
+        )
         reasons.extend(f"{reason}: {line}" for reason in line_reasons)
         consumed.append(line)
 
@@ -252,7 +260,7 @@ def normalized_set_signatures(outcome: ParseOutcome) -> set[tuple[str, str, str,
             signatures.add(
                 (
                     exercise.canonical_name or normalize_text(exercise.raw_name),
-                    exercise.equipment or "",
+                    normalize_equipment(exercise.equipment),
                     str(item.weight_kg.normalize()),
                     str(item.reps),
                 )

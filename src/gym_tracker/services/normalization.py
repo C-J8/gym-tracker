@@ -1,14 +1,13 @@
 import re
 import unicodedata
 from dataclasses import dataclass
-from decimal import Decimal
 
 
 @dataclass(frozen=True)
 class ExerciseMatch:
     canonical_name: str
     muscle_group: str
-    equipment: str
+    equipment: str | None = None
     load_basis: str = "total"
 
 
@@ -18,39 +17,109 @@ def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" -:")
 
 
+def normalize_catalog_key(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value.casefold())
+    characters = []
+    for character in value:
+        category = unicodedata.category(character)
+        if category == "Mn":
+            continue
+        characters.append(" " if category[0] in {"P", "S"} else character)
+    return re.sub(r"\s+", " ", "".join(characters)).strip()
+
+
+def normalize_muscle_group(value: str) -> str:
+    key = normalize_catalog_key(value)
+    aliases = {
+        "ombros": "ombro",
+        "abdome": "abdomen",
+    }
+    return aliases.get(key, key)
+
+
+def normalize_message_content(value: str) -> str:
+    value = unicodedata.normalize("NFC", value.replace("\r\n", "\n").replace("\r", "\n"))
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in value.splitlines()]
+    return "\n".join(lines).strip()
+
+
+def normalize_equipment(value: str | None) -> str:
+    key = normalize_catalog_key(value or "")
+    aliases = {
+        "maquina": "maquina",
+        "maquina com anilha": "maquina com anilha",
+        "halter": "halter",
+        "cabo": "cabo",
+        "corda": "cabo",
+        "barra livre": "barra livre",
+        "peso corporal": "peso corporal",
+    }
+    return aliases.get(key, key)
+
+
+EQUIPMENT_DISPLAY = {
+    "maquina": "Máquina",
+    "maquina com anilha": "Máquina com anilha",
+    "halter": "Halter",
+    "cabo": "Cabo",
+    "barra livre": "Barra livre",
+    "peso corporal": "Peso corporal",
+}
+
+
+def canonical_equipment(value: str | None) -> str | None:
+    normalized = normalize_equipment(value)
+    return EQUIPMENT_DISPLAY.get(normalized)
+
+
+def default_load_basis(equipment: str) -> str:
+    return "por_halter" if normalize_equipment(equipment) == "halter" else "total"
+
+
 CATALOG_RULES: tuple[tuple[tuple[str, ...], ExerciseMatch], ...] = (
-    (("crucifixo costas",), ExerciseMatch("Crucifixo costas", "Costas", "Máquina")),
-    (("supino inclinado",), ExerciseMatch("Supino inclinado", "Peito", "Máquina")),
-    (("supino reto", "supino halter"), ExerciseMatch("Supino reto", "Peito", "Máquina")),
-    (("parece triceps", "triceps2_peito"), ExerciseMatch("Press peito/tríceps", "Peito", "Máquina")),
-    (("fechar peito",), ExerciseMatch("Crucifixo", "Peito", "Máquina")),
-    (("crucifixo",), ExerciseMatch("Crucifixo", "Peito", "Máquina")),
-    (("puxada alta",), ExerciseMatch("Puxada alta", "Costas", "Máquina")),
-    (("puxada baixa",), ExerciseMatch("Puxada baixa", "Costas", "Máquina")),
-    (("puxada lateral",), ExerciseMatch("Puxada lateral", "Costas", "Máquina")),
-    (("maquina serrote", "serrote"), ExerciseMatch("Serrote", "Costas", "Máquina")),
-    (("triceps unilateral", "triceps uni"), ExerciseMatch("Tríceps unilateral", "Tríceps", "Cabo")),
+    (("crucifixo costas",), ExerciseMatch("Crucifixo costas", "Costas")),
+    (("supino inclinado",), ExerciseMatch("Supino inclinado", "Peito")),
+    (("supino reto", "supino halter"), ExerciseMatch("Supino reto", "Peito")),
+    (("parece triceps", "triceps2_peito"), ExerciseMatch("Press peito/tríceps", "Peito")),
+    (("fechar peito",), ExerciseMatch("Crucifixo", "Peito")),
+    (("crucifixo",), ExerciseMatch("Crucifixo", "Peito")),
+    (("puxada alta",), ExerciseMatch("Puxada alta", "Costas")),
+    (("puxada baixa",), ExerciseMatch("Puxada baixa", "Costas")),
+    (("puxada lateral",), ExerciseMatch("Puxada lateral", "Costas")),
+    (("maquina serrote", "serrote"), ExerciseMatch("Serrote", "Costas")),
+    (("triceps unilateral", "triceps uni"), ExerciseMatch("Tríceps unilateral", "Tríceps")),
     (("triceps corda lado",), ExerciseMatch("Tríceps lateral", "Tríceps", "Cabo")),
-    (("triceps corda", "triceps barra", "triceps"), ExerciseMatch("Tríceps", "Tríceps", "Cabo")),
+    (("triceps corda", "triceps barra", "triceps"), ExerciseMatch("Tríceps", "Tríceps")),
     (
         ("biceps antb", "biceps antebraco", "biceps que pega antbraco"),
-        ExerciseMatch("Bíceps antebraço", "Bíceps", "Halter", "por_halter"),
+        ExerciseMatch("Bíceps antebraço", "Bíceps"),
     ),
     (("biceps zootman", "biceps zottman"), ExerciseMatch("Bíceps zottman", "Bíceps", "Halter", "por_halter")),
     (("biceps hack",), ExerciseMatch("Bíceps hack", "Bíceps", "Halter", "por_halter")),
     (("biceps corda",), ExerciseMatch("Bíceps", "Bíceps", "Cabo")),
-    (("biceps maquina", "biceps barra maquina", "biceps"), ExerciseMatch("Bíceps", "Bíceps", "Máquina")),
-    (("antbdentro", "antebraco dentro"), ExerciseMatch("Antebraço dentro", "Antebraço", "Halter", "por_halter")),
+    (("biceps maquina", "biceps barra maquina", "biceps"), ExerciseMatch("Bíceps", "Bíceps")),
+    (("antbdentro", "antebraco dentro"), ExerciseMatch("Antebraço dentro", "Antebraço")),
     (("antebraco puxada", "antbraco puxada"), ExerciseMatch("Antebraço puxada", "Antebraço", "Cabo")),
     (("extensora",), ExerciseMatch("Extensora", "Pernas", "Máquina")),
     (("flexora",), ExerciseMatch("Flexora", "Pernas", "Máquina")),
     (("abdutora",), ExerciseMatch("Abdutora", "Pernas", "Máquina")),
     (("adutora",), ExerciseMatch("Adutora", "Pernas", "Máquina")),
-    (("desenvolvimento",), ExerciseMatch("Desenvolvimento", "Ombro", "Máquina")),
-    (("lateral",), ExerciseMatch("Lateral", "Ombro", "Máquina")),
-    (("abdominal", "abd maquina", "abdmaq", "abd", "maquina"), ExerciseMatch("Abdominal", "Abdômen", "Máquina")),
-    (("barra",), ExerciseMatch("Barra", "Costas", "Máquina")),
+    (("desenvolvimento",), ExerciseMatch("Desenvolvimento", "Ombro")),
+    (("lateral",), ExerciseMatch("Lateral", "Ombro")),
+    (("abdominal", "abd maquina", "abdmaq", "abd", "maquina"), ExerciseMatch("Abdominal", "Abdômen")),
+    (("barra",), ExerciseMatch("Barra", "Costas")),
 )
+
+
+def explicit_equipment(raw_name: str, context: str | None = None) -> str | None:
+    key = normalize_text(f"{context or ''} {raw_name}")
+    if re.search(r"\bhalter(?:es)?\b", key):
+        return "Halter"
+    if re.search(r"\b(?:corda|cabo)\b", key):
+        return "Cabo"
+    if re.search(r"\b(?:maquina|maq)\b", key):
+        return "Máquina"
+    return None
 
 
 def resolve_static_exercise(raw_name: str, workout_type: str | None = None) -> ExerciseMatch | None:
@@ -59,37 +128,14 @@ def resolve_static_exercise(raw_name: str, workout_type: str | None = None) -> E
     if key == "maquina" and context != "abd":
         return None
 
-    for aliases, match in CATALOG_RULES:
+    for aliases, catalog_match in CATALOG_RULES:
         if any(alias in key for alias in aliases):
-            equipment = infer_equipment(key, match.equipment)
-            load_basis = "por_halter" if equipment == "Halter" else match.load_basis
-            return ExerciseMatch(match.canonical_name, match.muscle_group, equipment, load_basis)
+            equipment = explicit_equipment(raw_name, workout_type) or catalog_match.equipment
+            load_basis = "por_halter" if equipment == "Halter" else catalog_match.load_basis
+            return ExerciseMatch(
+                catalog_match.canonical_name,
+                catalog_match.muscle_group,
+                equipment,
+                load_basis,
+            )
     return None
-
-
-def infer_equipment(key: str, default: str) -> str:
-    if any(token in key for token in ("halter", "zootman", "zottman", "hack")):
-        return "Halter"
-    if any(token in key for token in ("corda", "triceps barra", "triceps uni", "puxada cabo")):
-        return "Cabo"
-    if any(token in key for token in ("maquina", "maq")):
-        return "Máquina"
-    return default
-
-
-def adjust_equipment_for_load(match: ExerciseMatch, raw_name: str, loads: list[Decimal]) -> ExerciseMatch:
-    key = normalize_text(raw_name)
-    explicit = any(token in key for token in ("halter", "maquina", "maq"))
-    equipment = match.equipment
-
-    if match.canonical_name in {"Supino reto", "Supino inclinado"} and not explicit and loads:
-        equipment = "Máquina" if max(loads) > Decimal("24") else "Halter"
-
-    if match.muscle_group == "Peito" and equipment == "Máquina" and loads and max(loads) <= Decimal("40"):
-        equipment = "Máquina com anilha"
-
-    if match.canonical_name == "Lateral" and not explicit and loads and max(loads) <= Decimal("10"):
-        equipment = "Halter"
-
-    load_basis = "por_halter" if equipment == "Halter" else "total"
-    return ExerciseMatch(match.canonical_name, match.muscle_group, equipment, load_basis)

@@ -10,6 +10,7 @@ streamlit.err.log
 htmlcov/
 .coverage
 quality_reports/
+local_backups/
 *.db
 *.sqlite*
 

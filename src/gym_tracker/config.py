@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.4-mini"
     llm_shadow_mode: bool = True
     llm_auto_accept: bool = False
-    parser_version: str = "2.1.0"
+    parser_version: str = "3.0.0"
 
 
 @lru_cache
