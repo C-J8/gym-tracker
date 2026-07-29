@@ -16,6 +16,11 @@
 | `exercise_aliases` | decisão aprendida | global ou por usuário |
 | `data_revisions` | versão visível | invalida o cache do dashboard |
 
+O bootstrap do CSV pode preencher somente `exercises`, `exercise_variants` e
+`exercise_aliases`. Ele não escreve em nenhuma tabela de origem ou resultado da
+pipeline. A coluna `peso_kg` confirma que a unidade legada é quilograma, mas
+nenhum peso do CSV é persistido; `load_basis` pertence exclusivamente à variante.
+
 ## Estados
 
 `parse_results.status`: `accepted`, `review`, `skipped`, `reused` ou `rejected`.

@@ -47,6 +47,27 @@ Carga não participa da resolução. A prioridade é:
 
 Quando há zero ou mais de uma variante possível, `equipment` permanece vazio e nenhuma série final é criada.
 
+A proposta da LLM não é evidência. Para autoaceitação, `equipment` e
+`load_basis` precisam ter sido resolvidos pelo texto, alias do usuário, contexto
+do bloco, catálogo determinístico ou variante confirmada. A origem usada fica em
+`resolution_evidence` no payload do resultado. Divergência ou ausência de
+evidência envia a mensagem inteira para revisão.
+
+## Catálogo auxiliar
+
+O bootstrap do CSV acontece fora da pipeline de treinos:
+
+```text
+CSV legado -> agregação e normalização -> exercícios / aliases / variantes
+```
+
+Ele não cria origem, parse run, resultado, treino ou série. A normalização de
+catálogo usa uma chave Unicode sem acentos, diferenças de caixa, pontuação
+irrelevante ou espaços extras, preservando o nome canônico legível já existente.
+Somente associações unívocas são aplicadas; ambiguidades permanecem em relatório.
+O dashboard PostgreSQL continua consultando exclusivamente séries aceitas e
+ativas originadas pela pipeline do TXT.
+
 ## Cache e semana
 
 `data_revisions` mantém uma versão monotônica. Importações, ativações, decisões de revisão e aliases incrementam essa versão. `data_signature()` consulta o valor fora do cache do Streamlit, invalidando o DataFrame automaticamente.

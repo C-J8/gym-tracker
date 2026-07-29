@@ -3,7 +3,7 @@
 ## Variáveis
 
 - `DATABASE_URL`: conexão SQLAlchemy.
-- `DATA_BACKEND`: `postgres` ou `csv`.
+- `DATA_BACKEND`: use `postgres`; o backend `csv` é rejeitado para o dashboard.
 - `GYM_TRACKER_USER_ID`: usuário mostrado no dashboard.
 - `OPENAI_API_KEY`: opcional.
 - `OPENAI_MODEL`: modelo auditado no parse run.
@@ -49,6 +49,41 @@ A listagem mostra data, motivo, método, trecho limitado, proposta e status. O d
 ## Comparação legada
 
 O comparador normaliza Unicode, acentos, caixa, espaços, equipamento e números. Diferenças apenas visuais não contam como alteração. Equipamentos ou séries realmente diferentes continuam aparecendo.
+
+## Bootstrap do catálogo pelo CSV
+
+O CSV legado é uma fonte auxiliar de catálogo, nunca uma fonte de treinos. Antes
+de aplicar, execute o dry-run:
+
+```bash
+uv run python -m gym_tracker.cli bootstrap-catalog \
+  --file academia_treinos_whatsapp.csv \
+  --user UUID
+```
+
+O relatório informa linhas, duplicatas, associações unívocas, ambiguidades, itens
+não encontrados e registros planejados. Para aplicar somente as associações
+unívocas:
+
+```bash
+uv run python -m gym_tracker.cli bootstrap-catalog \
+  --file academia_treinos_whatsapp.csv \
+  --user UUID \
+  --apply
+```
+
+O bootstrap agrega todas as linhas equivalentes antes de decidir. Nomes usam uma
+chave Unicode sem diferenças de acento, caixa, pontuação irrelevante ou espaços;
+o nome canônico legível já existente é preservado. Equipamento, grupo, unidade
+e `load_basis` só são confirmados quando há um único valor consistente.
+Conflitos e nomes sem correspondência determinística ficam no relatório, sem
+escolha por frequência.
+
+O comando é transacional e idempotente. Ele pode criar ou reutilizar exercícios,
+aliases do usuário e variantes, mas nunca cria `workouts`, `sets`, mensagens,
+imports, parse runs ou parse results. Para repetir a validação, use um banco
+PostgreSQL descartável, aplique migrations até `head`, rode dry-run, aplicação e
+uma segunda aplicação, e confirme que as tabelas da pipeline continuam vazias.
 
 ## Limitações
 

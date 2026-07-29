@@ -31,7 +31,8 @@ uv run alembic upgrade head
 uv run python -m gym_tracker.cli db-upgrade
 uv run python -m gym_tracker.cli import-whatsapp --file export.txt --user UUID
 uv run python -m gym_tracker.cli import-whatsapp --file export.txt --user UUID --parser-version 3.1.0
-uv run python -m gym_tracker.cli import-legacy-csv --file academia_treinos_whatsapp.csv --user UUID
+uv run python -m gym_tracker.cli bootstrap-catalog --file academia_treinos_whatsapp.csv --user UUID
+uv run python -m gym_tracker.cli bootstrap-catalog --file academia_treinos_whatsapp.csv --user UUID --apply
 uv run python -m gym_tracker.cli quality-report --import-id UUID
 uv run python -m gym_tracker.cli evaluate-parser --file export.txt
 uv run python -m gym_tracker.cli list-reviews --status pending
@@ -39,6 +40,12 @@ uv run python -m gym_tracker.cli show-review --review-id UUID --json
 uv run python -m gym_tracker.cli accept-review --review-id UUID --payload correcao.json --save-alias "sup reto halter"
 uv run python -m gym_tracker.cli reject-review --review-id UUID
 ```
+
+`bootstrap-catalog` executa dry-run por padrão. Somente `--apply` grava associações
+unívocas de exercício, alias e variante. O comando nunca cria treinos, séries,
+mensagens, imports ou parse runs, e o CSV não alimenta o dashboard PostgreSQL.
+Conflitos de equipamento, grupo, unidade ou `load_basis` permanecem no relatório
+para revisão.
 
 Para reprocessar o TXT atual, comparar com o CSV e preservar ambos:
 
@@ -49,16 +56,12 @@ uv run python -m gym_tracker.cli compare-legacy \
   --output-dir quality_reports
 ```
 
-## Modo CSV
+## Fonte do dashboard
 
-O backend padrão é PostgreSQL. Para abrir o dashboard sem banco:
-
-```powershell
-$env:DATA_BACKEND="csv"
-uv run streamlit run app.py
-```
-
-Esse modo é explícito e não participa do pipeline oficial.
+O dashboard usa exclusivamente resultados aceitos e ativos no PostgreSQL. O
+backend CSV foi desativado para evitar que o legado se torne uma segunda fonte
+de séries. O arquivo permanece disponível somente para bootstrap do catálogo e
+comparação de qualidade.
 
 ## Qualidade
 
