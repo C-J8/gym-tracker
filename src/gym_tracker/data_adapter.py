@@ -1,6 +1,5 @@
 import os
 import uuid
-from pathlib import Path
 
 import pandas as pd
 from sqlalchemy.exc import SQLAlchemyError
@@ -19,8 +18,7 @@ class DataBackendError(RuntimeError):
 def data_signature(settings: Settings | None = None) -> str:
     settings = settings or get_settings()
     if settings.data_backend == "csv":
-        path = settings.legacy_csv_path
-        return f"csv:{path}:{path.stat().st_mtime if path.exists() else 'missing'}"
+        return "csv:disabled"
     try:
         factory = get_session_factory(settings.database_url)
         with factory() as session:
@@ -36,10 +34,10 @@ def load_dashboard_data(
 ) -> pd.DataFrame:
     settings = settings or get_settings()
     if settings.data_backend == "csv":
-        path = Path(settings.legacy_csv_path)
-        if not path.exists():
-            raise DataBackendError(f"CSV legado nao encontrado: {path}")
-        return prepare_dashboard_dataframe(pd.read_csv(path))
+        raise DataBackendError(
+            "O backend CSV foi desativado. Use bootstrap-catalog para preparar o catalogo "
+            "e importe treinos pelo TXT do WhatsApp no PostgreSQL."
+        )
     try:
         factory = get_session_factory(settings.database_url)
         with factory() as session:
@@ -63,8 +61,7 @@ def load_dashboard_data(
     except SQLAlchemyError as error:
         raise DataBackendError(
             "Nao foi possivel conectar ao PostgreSQL. Inicie o banco com "
-            "`docker compose up -d postgres` e aplique `uv run alembic upgrade head`, "
-            "ou use DATA_BACKEND=csv para o modo legado."
+            "`docker compose up -d postgres` e aplique `uv run alembic upgrade head`."
         ) from error
     if data.empty:
         raise DataBackendError("O PostgreSQL esta acessivel, mas ainda nao possui series importadas.")

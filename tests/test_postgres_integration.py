@@ -10,8 +10,21 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from gym_tracker.config import Settings, get_settings
-from gym_tracker.models import Import, ImportMessageOccurrence, ParseResult, ParseRun, RawMessage, User, WorkoutSet
+from gym_tracker.models import (
+    Exercise,
+    ExerciseAlias,
+    ExerciseVariant,
+    Import,
+    ImportMessageOccurrence,
+    ParseResult,
+    ParseRun,
+    RawMessage,
+    User,
+    Workout,
+    WorkoutSet,
+)
 from gym_tracker.repositories.dashboard import DashboardRepository
+from gym_tracker.services.catalog_bootstrap import bootstrap_catalog_from_csv
 from gym_tracker.services.whatsapp_import import import_whatsapp_file
 
 TEST_DATABASE_URL = os.getenv("GYM_TRACKER_TEST_DATABASE_URL")
@@ -633,3 +646,85 @@ def test_postgres_failed_upgrade_rolls_back_completely(monkeypatch) -> None:
         assert connection.scalar(text("SELECT count(*) FROM sets")) == 3
     engine.dispose()
     get_settings.cache_clear()
+
+
+def test_postgres_catalog_bootstrap_is_catalog_only_idempotent_and_multiuser(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    assert TEST_DATABASE_URL is not None
+    _reset_test_database(TEST_DATABASE_URL)
+    _migrate(TEST_DATABASE_URL, "head", monkeypatch)
+    source = tmp_path / "catalog.csv"
+    source.write_text(
+        "data,grupo_muscular,exercicio,tipo,peso_kg,serie,repeticoes\n2026-01-01,Pernas,Extensora,Máquina,40,1,10\n",
+        encoding="utf-8-sig",
+    )
+    engine = create_engine(TEST_DATABASE_URL)
+    try:
+        with Session(engine) as session:
+            first_user = User(display_name="Pessoa A")
+            second_user = User(display_name="Pessoa B")
+            session.add_all((first_user, second_user))
+            session.commit()
+
+            dry_run = bootstrap_catalog_from_csv(session, source, first_user.id)
+            assert dry_run.records_planned == {"exercises": 1, "aliases": 1, "variants": 1}
+            assert session.scalar(select(func.count()).select_from(Exercise)) == 0
+
+            first = bootstrap_catalog_from_csv(session, source, first_user.id, apply=True)
+            second = bootstrap_catalog_from_csv(session, source, first_user.id, apply=True)
+            other_user = bootstrap_catalog_from_csv(session, source, second_user.id, apply=True)
+            session.commit()
+
+            assert first.records_created == {"exercises": 1, "aliases": 1, "variants": 1}
+            assert second.records_created == {"exercises": 0, "aliases": 0, "variants": 0}
+            assert other_user.records_created == {"exercises": 0, "aliases": 1, "variants": 0}
+            assert session.scalar(select(func.count()).select_from(Exercise)) == 1
+            assert session.scalar(select(func.count()).select_from(ExerciseAlias)) == 2
+            assert session.scalar(select(func.count()).select_from(ExerciseVariant)) == 1
+            for model in (Workout, WorkoutSet, RawMessage, Import, ParseRun, ParseResult):
+                assert session.scalar(select(func.count()).select_from(model)) == 0
+    finally:
+        engine.dispose()
+
+
+def test_postgres_catalog_bootstrap_failure_rolls_back_completely(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    assert TEST_DATABASE_URL is not None
+    _reset_test_database(TEST_DATABASE_URL)
+    _migrate(TEST_DATABASE_URL, "head", monkeypatch)
+    source = tmp_path / "catalog-rollback.csv"
+    source.write_text(
+        "data,grupo_muscular,exercicio,tipo,peso_kg,serie,repeticoes\n"
+        "2026-01-01,Pernas,Extensora,Máquina,40,1,10\n"
+        "2026-01-01,Pernas,Flexora,Máquina,30,1,8\n",
+        encoding="utf-8-sig",
+    )
+
+    def fail_after_first(index, association) -> None:
+        del association
+        if index == 0:
+            raise RuntimeError("falha sintetica")
+
+    monkeypatch.setattr(
+        "gym_tracker.services.catalog_bootstrap.catalog_bootstrap_apply_hook",
+        fail_after_first,
+    )
+    engine = create_engine(TEST_DATABASE_URL)
+    try:
+        with Session(engine) as session:
+            user = User(display_name="Pessoa")
+            session.add(user)
+            session.commit()
+            with pytest.raises(RuntimeError, match="sintetica"):
+                bootstrap_catalog_from_csv(session, source, user.id, apply=True)
+            session.commit()
+
+            assert session.scalar(select(func.count()).select_from(Exercise)) == 0
+            assert session.scalar(select(func.count()).select_from(ExerciseAlias)) == 0
+            assert session.scalar(select(func.count()).select_from(ExerciseVariant)) == 0
+    finally:
+        engine.dispose()

@@ -17,6 +17,26 @@ def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" -:")
 
 
+def normalize_catalog_key(value: str) -> str:
+    value = unicodedata.normalize("NFKD", value.casefold())
+    characters = []
+    for character in value:
+        category = unicodedata.category(character)
+        if category == "Mn":
+            continue
+        characters.append(" " if category[0] in {"P", "S"} else character)
+    return re.sub(r"\s+", " ", "".join(characters)).strip()
+
+
+def normalize_muscle_group(value: str) -> str:
+    key = normalize_catalog_key(value)
+    aliases = {
+        "ombros": "ombro",
+        "abdome": "abdomen",
+    }
+    return aliases.get(key, key)
+
+
 def normalize_message_content(value: str) -> str:
     value = unicodedata.normalize("NFC", value.replace("\r\n", "\n").replace("\r", "\n"))
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in value.splitlines()]
@@ -24,7 +44,7 @@ def normalize_message_content(value: str) -> str:
 
 
 def normalize_equipment(value: str | None) -> str:
-    key = normalize_text(value or "")
+    key = normalize_catalog_key(value or "")
     aliases = {
         "maquina": "maquina",
         "maquina com anilha": "maquina com anilha",
@@ -35,6 +55,25 @@ def normalize_equipment(value: str | None) -> str:
         "peso corporal": "peso corporal",
     }
     return aliases.get(key, key)
+
+
+EQUIPMENT_DISPLAY = {
+    "maquina": "Máquina",
+    "maquina com anilha": "Máquina com anilha",
+    "halter": "Halter",
+    "cabo": "Cabo",
+    "barra livre": "Barra livre",
+    "peso corporal": "Peso corporal",
+}
+
+
+def canonical_equipment(value: str | None) -> str | None:
+    normalized = normalize_equipment(value)
+    return EQUIPMENT_DISPLAY.get(normalized)
+
+
+def default_load_basis(equipment: str) -> str:
+    return "por_halter" if normalize_equipment(equipment) == "halter" else "total"
 
 
 CATALOG_RULES: tuple[tuple[tuple[str, ...], ExerciseMatch], ...] = (

@@ -61,3 +61,12 @@ def test_review_cli_exposes_list_and_detail_context(session: Session, user: User
     assert detail["original_content"] == "Movimento X 10kg/10rep"
     assert "proposed_payload" in detail
     assert build_parser().parse_args(["show-review", "--review-id", str(review.id), "--json"]).json is True
+
+
+def test_catalog_bootstrap_cli_defaults_to_dry_run_and_requires_apply_flag() -> None:
+    user_id = "00000000-0000-0000-0000-000000000001"
+    dry_run = build_parser().parse_args(["bootstrap-catalog", "--file", "legacy.csv", "--user", user_id])
+    applied = build_parser().parse_args(["bootstrap-catalog", "--file", "legacy.csv", "--user", user_id, "--apply"])
+
+    assert dry_run.apply is False
+    assert applied.apply is True

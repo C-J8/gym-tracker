@@ -11,7 +11,7 @@ from gym_tracker.config import get_settings
 from gym_tracker.db import session_scope
 from gym_tracker.models import Import, ParseReview, ReviewStatus, User
 from gym_tracker.schemas import WorkoutExtraction
-from gym_tracker.services.legacy_import import import_legacy_csv
+from gym_tracker.services.catalog_bootstrap import bootstrap_catalog_from_csv
 from gym_tracker.services.legacy_migration import compare_legacy_sources
 from gym_tracker.services.parser import parse_workout_message, split_whatsapp_messages
 from gym_tracker.services.reviews import accept_review, reject_review
@@ -97,9 +97,14 @@ def build_parser() -> argparse.ArgumentParser:
     import_whatsapp.add_argument("--file", required=True, type=Path)
     import_whatsapp.add_argument("--user", required=True, type=_uuid)
     import_whatsapp.add_argument("--parser-version", help="sobrescreve PARSER_VERSION para este parse run")
-    import_csv = subcommands.add_parser("import-legacy-csv", help="importa o CSV legado")
-    import_csv.add_argument("--file", required=True, type=Path)
-    import_csv.add_argument("--user", required=True, type=_uuid)
+    bootstrap = subcommands.add_parser("bootstrap-catalog", help="prepara o catalogo usando o CSV legado")
+    bootstrap.add_argument("--file", required=True, type=Path)
+    bootstrap.add_argument("--user", required=True, type=_uuid)
+    bootstrap.add_argument(
+        "--apply",
+        action="store_true",
+        help="aplica associacoes univocas; sem esta opcao o comando executa dry-run",
+    )
     quality = subcommands.add_parser("quality-report", help="mostra o relatorio de uma importacao")
     quality.add_argument("--import-id", required=True, type=_uuid)
     evaluate = subcommands.add_parser("evaluate-parser", help="avalia o parser sem gravar no banco")
@@ -163,8 +168,8 @@ def main(argv: list[str] | None = None) -> None:
                 else configured
             )
             _print(import_whatsapp_file(session, args.file, args.user, settings=run_settings))
-        elif args.command == "import-legacy-csv":
-            _print(import_legacy_csv(session, args.file, args.user))
+        elif args.command == "bootstrap-catalog":
+            _print(bootstrap_catalog_from_csv(session, args.file, args.user, apply=args.apply))
         elif args.command == "quality-report":
             record = session.get(Import, args.import_id)
             if record is None:

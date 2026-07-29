@@ -61,6 +61,7 @@ class ParseOutcome(BaseModel):
     extraction: WorkoutExtraction | None = None
     reasons: list[str] = Field(default_factory=list)
     consumed_lines: list[str] = Field(default_factory=list)
+    resolution_evidence: list[dict[str, str | int | None]] = Field(default_factory=list)
     parse_method: str = "rule"
 
     @property
@@ -85,3 +86,28 @@ class QualityReport(BaseModel):
     normalized_duplicates: int = 0
     llm_proposals: int = 0
     reasons: dict[str, int] = Field(default_factory=dict)
+
+
+class CatalogReviewItem(BaseModel):
+    normalized_key: str
+    status: str
+    reasons: list[str] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
+
+
+class CatalogBootstrapReport(BaseModel):
+    dry_run: bool
+    applied: bool
+    rows_read: int = 0
+    exact_duplicates: int = 0
+    unique_rows: int = 0
+    normalized_exercises: int = 0
+    applicable_associations: int = 0
+    ambiguities: int = 0
+    not_found: int = 0
+    records_created: dict[str, int] = Field(default_factory=dict)
+    records_updated: dict[str, int] = Field(default_factory=dict)
+    records_reused: dict[str, int] = Field(default_factory=dict)
+    records_planned: dict[str, int] = Field(default_factory=dict)
+    records_ignored: int = 0
+    review_items: list[CatalogReviewItem] = Field(default_factory=list)
