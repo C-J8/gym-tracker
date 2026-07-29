@@ -96,26 +96,38 @@ def _resolve_database_context(session: Session, user_id: uuid.UUID, outcome: Par
     if outcome.extraction is None:
         return outcome
     remaining_reasons = list(outcome.reasons)
-    for exercise in outcome.extraction.exercises:
+    resolution_evidence: list[dict[str, str | int | None]] = []
+    for index, exercise in enumerate(outcome.extraction.exercises):
+        parser_equipment = exercise.equipment
+        parser_load_basis = exercise.load_basis
         equipment_in_message = explicit_equipment(exercise.raw_name)
         equipment_in_context = explicit_equipment(outcome.extraction.workout_type or "")
         alias = find_alias(session, exercise.raw_name, user_id)
+        equipment_source = None
         if exercise.canonical_name is None and alias is not None:
             exercise.canonical_name = alias.canonical_name
             exercise.muscle_group = alias.muscle_group
         if equipment_in_message is not None:
             exercise.equipment = equipment_in_message
             exercise.load_basis = "por_halter" if equipment_in_message == "Halter" else "total"
+            equipment_source = "explicit_line"
         elif alias is not None and alias.equipment is not None:
             exercise.equipment = alias.equipment
             exercise.load_basis = alias.load_basis
+            equipment_source = "user_alias"
         elif equipment_in_context is not None:
             exercise.equipment = equipment_in_context
             exercise.load_basis = "por_halter" if equipment_in_context == "Halter" else "total"
+            equipment_source = "explicit_context"
+        elif parser_equipment is not None:
+            exercise.equipment = parser_equipment
+            exercise.load_basis = parser_load_basis
+            equipment_source = "deterministic_catalog"
         if exercise.equipment is None and exercise.canonical_name:
             confirmed = find_confirmed_variant(session, exercise.canonical_name, user_id)
             if confirmed is not None:
                 exercise.equipment, exercise.load_basis = confirmed
+                equipment_source = "confirmed_variant"
 
         if exercise.canonical_name:
             remaining_reasons = [
@@ -134,8 +146,18 @@ def _resolve_database_context(session: Session, user_id: uuid.UUID, outcome: Par
             ]
             exercise.uncertain_fields = [field for field in exercise.uncertain_fields if field != "equipment"]
         exercise.needs_review = bool(exercise.uncertain_fields)
+        resolution_evidence.append(
+            {
+                "exercise_index": index,
+                "equipment": exercise.equipment,
+                "load_basis": exercise.load_basis if exercise.equipment else None,
+                "equipment_source": equipment_source,
+                "load_basis_source": equipment_source,
+            }
+        )
 
     outcome.reasons = remaining_reasons
+    outcome.resolution_evidence = resolution_evidence
     outcome.extraction.needs_review = bool(
         remaining_reasons or any(item.needs_review for item in outcome.extraction.exercises)
     )
@@ -170,11 +192,18 @@ def _payload_for_review(
 ) -> dict:
     payload: dict = {
         "rule": deterministic.extraction.model_dump(mode="json") if deterministic.extraction else None,
+        "resolution_evidence": deterministic.resolution_evidence,
     }
     if llm_proposal is not None:
         payload["llm"] = llm_proposal.model_dump(mode="json")
         payload["llm_model"] = extractor.model if extractor else None
         payload["prompt_version"] = extractor.prompt_version if extractor else None
+    return payload
+
+
+def _accepted_payload(extraction: WorkoutExtraction, evidence: list[dict[str, str | int | None]]) -> dict:
+    payload = extraction.model_dump(mode="json")
+    payload["resolution_evidence"] = evidence
     return payload
 
 
@@ -511,7 +540,7 @@ def import_whatsapp_file(
             raw_message=raw_message,
             status=ParseResultStatus.SKIPPED.value,
             parse_method=ParseMethod.RULE.value,
-            payload=outcome.extraction.model_dump(mode="json") if outcome.extraction else None,
+            payload=_accepted_payload(outcome.extraction, outcome.resolution_evidence) if outcome.extraction else None,
             reasons=reasons,
         )
         session.add(result)
@@ -535,7 +564,13 @@ def import_whatsapp_file(
             else []
         )
         source_evidence_reasons = (
-            llm_source_evidence_reasons(outcome.extraction, llm_proposal) if llm_proposal is not None else []
+            llm_source_evidence_reasons(
+                outcome.extraction,
+                llm_proposal,
+                outcome.resolution_evidence,
+            )
+            if llm_proposal is not None
+            else []
         )
         can_auto_accept_llm = (
             llm_proposal is not None
@@ -566,7 +601,7 @@ def import_whatsapp_file(
         accepted_extraction = llm_proposal if can_auto_accept_llm else outcome.extraction
         parse_method = ParseMethod.LLM.value if can_auto_accept_llm else ParseMethod.RULE.value
         result.parse_method = parse_method
-        result.payload = accepted_extraction.model_dump(mode="json")
+        result.payload = _accepted_payload(accepted_extraction, outcome.resolution_evidence)
         report.sets_accepted += _materialize_extraction(
             session,
             user_id,

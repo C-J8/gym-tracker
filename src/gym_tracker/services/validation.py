@@ -8,6 +8,7 @@ from gym_tracker.services.loads import (
     MIN_PLAUSIBLE_LOAD_KG,
     validate_materializable_load,
 )
+from gym_tracker.services.normalization import normalize_equipment
 
 
 class ReviewReasonKind(enum.StrEnum):
@@ -35,6 +36,8 @@ class ReviewReasonCode(enum.StrEnum):
     NO_MATERIALIZABLE_SETS = "proposta sem series materializaveis"
     UNMATERIALIZABLE_SET = "serie nao materializavel"
     PROPOSAL_SOURCE_MISMATCH = "proposta diverge dos valores da origem"
+    MISSING_SOURCE_EVIDENCE = "proposta sem evidencia da origem"
+    PROPOSAL_FIELD_MISMATCH = "proposta diverge do campo sustentado"
     UNCONSUMED_CONTENT = "parte relevante da mensagem nao consumida"
     UNCONSUMED_TOKENS = "tokens relevantes nao consumidos"
     INVALID_LOAD = "carga invalida"
@@ -67,6 +70,8 @@ REASON_KINDS = {
     ReviewReasonCode.NO_MATERIALIZABLE_SETS: ReviewReasonKind.MANDATORY_MISSING,
     ReviewReasonCode.UNMATERIALIZABLE_SET: ReviewReasonKind.AMBIGUOUS_OR_SUSPICIOUS,
     ReviewReasonCode.PROPOSAL_SOURCE_MISMATCH: ReviewReasonKind.AMBIGUOUS_OR_SUSPICIOUS,
+    ReviewReasonCode.MISSING_SOURCE_EVIDENCE: ReviewReasonKind.AMBIGUOUS_OR_SUSPICIOUS,
+    ReviewReasonCode.PROPOSAL_FIELD_MISMATCH: ReviewReasonKind.AMBIGUOUS_OR_SUSPICIOUS,
     ReviewReasonCode.UNCONSUMED_CONTENT: ReviewReasonKind.AMBIGUOUS_OR_SUSPICIOUS,
     ReviewReasonCode.UNCONSUMED_TOKENS: ReviewReasonKind.AMBIGUOUS_OR_SUSPICIOUS,
     ReviewReasonCode.INVALID_LOAD: ReviewReasonKind.AMBIGUOUS_OR_SUSPICIOUS,
@@ -163,8 +168,11 @@ def extraction_materialization_reasons(extraction: WorkoutExtraction) -> list[st
 def llm_source_evidence_reasons(
     deterministic: WorkoutExtraction,
     proposal: WorkoutExtraction,
+    resolution_evidence: list[dict[str, str | int | None]],
 ) -> list[str]:
     if proposal.workout_date != deterministic.workout_date:
+        return [ReviewReasonCode.PROPOSAL_SOURCE_MISMATCH.value]
+    if len(proposal.exercises) != len(deterministic.exercises):
         return [ReviewReasonCode.PROPOSAL_SOURCE_MISMATCH.value]
 
     try:
@@ -180,7 +188,27 @@ def llm_source_evidence_reasons(
         return [ReviewReasonCode.PROPOSAL_SOURCE_MISMATCH.value]
     if proposed_sets != deterministic_sets:
         return [ReviewReasonCode.PROPOSAL_SOURCE_MISMATCH.value]
-    return []
+
+    evidence_by_index = {
+        item["exercise_index"]: item for item in resolution_evidence if isinstance(item.get("exercise_index"), int)
+    }
+    reasons: list[str] = []
+    for index, (source_exercise, proposed_exercise) in enumerate(
+        zip(deterministic.exercises, proposal.exercises, strict=True)
+    ):
+        evidence = evidence_by_index.get(index, {})
+        equipment_source = evidence.get("equipment_source")
+        load_basis_source = evidence.get("load_basis_source")
+        if not equipment_source or not source_exercise.equipment:
+            reasons.append(f"{ReviewReasonCode.MISSING_SOURCE_EVIDENCE.value}: equipment[{index}]")
+        elif normalize_equipment(proposed_exercise.equipment) != normalize_equipment(source_exercise.equipment):
+            reasons.append(f"{ReviewReasonCode.PROPOSAL_FIELD_MISMATCH.value}: equipment[{index}]")
+
+        if not load_basis_source or not source_exercise.equipment:
+            reasons.append(f"{ReviewReasonCode.MISSING_SOURCE_EVIDENCE.value}: load_basis[{index}]")
+        elif proposed_exercise.load_basis != source_exercise.load_basis:
+            reasons.append(f"{ReviewReasonCode.PROPOSAL_FIELD_MISMATCH.value}: load_basis[{index}]")
+    return reasons
 
 
 def review_reasons(outcome: ParseOutcome, known_alias: bool = True) -> list[str]:
