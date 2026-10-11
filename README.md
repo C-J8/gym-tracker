@@ -1,25 +1,54 @@
 # Gym Tracker
 
-Dashboard Streamlit e pipeline rastreável para importar treinos registrados no WhatsApp. O PostgreSQL é a fonte oficial; o CSV existente continua disponível como modo legado/demonstração.
+Dashboard Streamlit e pipeline rastreável para importar treinos registrados no WhatsApp. O PostgreSQL é a fonte oficial; o CSV existente é usado apenas para catálogo e comparação, nunca como fonte do dashboard.
+
+## Atualizar apenas o TXT
+
+Com a Academia configurada no Planner, use **Abrir Planner**: ele inicia o
+dashboard e o monitor do TXT. Clique em **Academia** no menu para os gráficos.
+**Parar Planner** encerra os processos iniciados pelo atalho. O início continua
+manual; nada é instalado na Inicialização do Windows.
+
+Nesta instalação, Academia e Planner usam o mesmo servidor PostgreSQL na porta
+**5434**, com bancos separados. Abra **Abrir Planner** para iniciar o servidor,
+ou siga o [guia do servidor compartilhado](docs/shared-postgres.md).
+
+Depois de abrir o Planner, substitua
+`whatsapp_acad_export/Conversa do WhatsApp com Acad.txt` quando exportar novos treinos.
+O monitor importa em segundo plano, evita duplicatas e mantém dúvidas para revisão,
+sem Airflow ou chamadas pagas de IA. Antes de cada importação nova ou mudança
+do parser, salva um backup; se o backup falhar, não altera o banco.
+
+O guia principal do uso combinado está em `E:\trabalhos\ToDoList\docs\uso-local.md`.
+Para operar somente o importador, os três CMDs estão em `scripts/maintenance/`,
+fora da rotina diária. Veja [detalhes técnicos da importação](docs/automatic-import.md).
 
 ## Início rápido
 
 Pré-requisitos: Python 3.12, [uv](https://docs.astral.sh/uv/) e Docker com Compose.
 
+Os comandos abaixo são para uma **instalação independente nova**. Na instalação
+compartilhada existente, não crie outro banco/usuário: siga o guia acima.
+Para a instalação independente, configure a porta **5432** em `DATABASE_URL`
+no `.env`; o exemplo está preparado para a instalação compartilhada na 5434.
+
 ```bash
 git clone https://github.com/C-J8/gym-tracker.git
 cd gym-tracker
 uv sync --locked --all-groups
-docker compose up -d postgres
-uv run alembic upgrade head
 ```
 
-Crie o arquivo `.env` a partir de `.env.example`. Depois crie um usuário e importe uma fonte:
+Antes de subir o banco ou aplicar migrations, crie `.env` a partir de
+`.env.example`, configure a porta 5432 e ajuste `GYM_BACKUP_CONTAINER` para o
+nome real do contêiner do serviço `postgres` (confira `docker ps`). Não substitua
+um `.env` existente. Depois crie um usuário e importe uma fonte:
 
 ```bash
+docker compose --profile legacy up -d postgres
+uv run alembic upgrade head
 uv run python -m gym_tracker.cli create-user --name "Meu nome"
 uv run python -m gym_tracker.cli import-whatsapp --file caminho/export.txt --user UUID_DO_USUARIO
-uv run streamlit run app.py
+uv run streamlit run app.py --server.address=127.0.0.1
 ```
 
 O dashboard abre em `http://localhost:8501`. Com mais de um usuário no banco, defina `GYM_TRACKER_USER_ID`.
@@ -72,6 +101,16 @@ uv run pytest
 uv run alembic check
 ```
 
+Com os dois projetos instalados e o Planner parado, o teste de acesso integrado
+usa apenas `planner_test` na porta 5435 e um SQLite com treinos sintéticos:
+
+```powershell
+.venv\Scripts\python.exe -B scripts/test-planner-integration.py
+```
+
+Ele verifica falhas de abertura/parada, reuso, recuperação do importador,
+menu opcional e backup antes da importação. Não importa o TXT pessoal.
+
 O CI executa os mesmos passos e também os testes de integração com PostgreSQL. Testes usam fixtures anonimizadas e nunca chamam serviços externos.
 
 ## Documentação
@@ -79,6 +118,7 @@ O CI executa os mesmos passos e também os testes de integração com PostgreSQL
 - [Arquitetura](docs/architecture.md)
 - [Contrato de dados](docs/data-contract.md)
 - [Operação, parsing e revisão](docs/operations.md)
+- [Importação automática local](docs/automatic-import.md)
 - [Privacidade](docs/privacy.md)
 
 Exports sobrepostos reutilizam mensagens canônicas e registram suas ocorrências em cada arquivo. Reprocessamentos são separados por `PARSER_VERSION`, e somente o resultado aceito ativo alimenta o dashboard. Veja a documentação para identidade, equipamento, unidades, cache e shadow mode.

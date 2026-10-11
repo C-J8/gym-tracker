@@ -85,6 +85,16 @@ def load_data(signature: str) -> pd.DataFrame:
     return load_dashboard_data()
 
 
+@st.fragment(run_every="60s")
+def refresh_imported_data() -> None:
+    """Poll only the revision; rerender charts when committed data changes."""
+    signature = data_signature()
+    previous = st.session_state.get("gym_data_signature")
+    st.session_state["gym_data_signature"] = signature
+    if previous is not None and previous != signature:
+        st.rerun()
+
+
 def format_number(value: float, decimals: int = 0) -> str:
     if pd.isna(value):
         return "-"
@@ -204,6 +214,8 @@ def metric_axis_label(metric: str) -> str:
         "estimativa_1rm": "1RM estimado",
     }[metric]
 
+
+refresh_imported_data()
 
 try:
     df = load_data(data_signature())

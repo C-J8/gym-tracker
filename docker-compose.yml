@@ -1,12 +1,15 @@
 services:
   postgres:
+    # Servidor antigo preservado para recuperacao/instalacoes independentes.
+    # No uso local consolidado, inicie ../ToDoList/compose.yaml (servico db).
+    profiles: [legacy]
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: gym_tracker
       POSTGRES_USER: gym_tracker
       POSTGRES_PASSWORD: gym_tracker
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gym_tracker -d gym_tracker"]
       interval: 5s

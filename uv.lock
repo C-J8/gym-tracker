@@ -280,7 +280,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pydantic-settings", specifier = ">=2.7,<3" },
     { name = "sqlalchemy", specifier = ">=2.0.36,<3" },
-    { name = "streamlit", specifier = ">=1.36,<2" },
+    { name = "streamlit", specifier = ">=1.37,<2" },
 ]
 
 [package.metadata.requires-dev]

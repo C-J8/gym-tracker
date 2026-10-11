@@ -11,6 +11,7 @@ htmlcov/
 .coverage
 quality_reports/
 local_backups/
+.gym-tracker/
 *.db
 *.sqlite*
 

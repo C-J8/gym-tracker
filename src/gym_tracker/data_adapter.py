@@ -25,7 +25,7 @@ def data_signature(settings: Settings | None = None) -> str:
             revision = current_data_revision(session)
     except SQLAlchemyError:
         revision = "unavailable"
-    return f"postgres:{revision}:{os.getenv('GYM_TRACKER_DATA_VERSION', '')}"
+    return f"postgres:{settings.gym_tracker_user_id}:{revision}:{os.getenv('GYM_TRACKER_DATA_VERSION', '')}"
 
 
 def load_dashboard_data(
@@ -43,9 +43,9 @@ def load_dashboard_data(
         with factory() as session:
             repository = DashboardRepository(session)
             if user_id is None:
-                configured_user = os.getenv("GYM_TRACKER_USER_ID")
+                configured_user = settings.gym_tracker_user_id
                 if configured_user:
-                    user_id = uuid.UUID(configured_user)
+                    user_id = configured_user
                 else:
                     users = repository.users()
                     if len(users) == 1:
@@ -60,8 +60,9 @@ def load_dashboard_data(
         raise
     except SQLAlchemyError as error:
         raise DataBackendError(
-            "Nao foi possivel conectar ao PostgreSQL. Inicie o banco com "
-            "`docker compose up -d postgres` e aplique `uv run alembic upgrade head`."
+            "Nao foi possivel conectar ao PostgreSQL. Confira DATABASE_URL e inicie "
+            "o servidor configurado conforme docs/shared-postgres.md. "
+            "Confira as migrations antes de alterar um banco existente."
         ) from error
     if data.empty:
         raise DataBackendError("O PostgreSQL esta acessivel, mas ainda nao possui series importadas.")

@@ -24,11 +24,49 @@ from gym_tracker.models import (
     WorkoutSet,
 )
 from gym_tracker.repositories.dashboard import DashboardRepository
+from gym_tracker.services.automatic_import import SourceNotReady, import_snapshot
 from gym_tracker.services.catalog_bootstrap import bootstrap_catalog_from_csv
 from gym_tracker.services.whatsapp_import import import_whatsapp_file
 
 TEST_DATABASE_URL = os.getenv("GYM_TRACKER_TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not TEST_DATABASE_URL, reason="GYM_TRACKER_TEST_DATABASE_URL nao configurada")
+
+
+def test_postgres_automatic_import_commits_once_and_serializes_user(tmp_path, monkeypatch):
+    assert TEST_DATABASE_URL is not None
+    _reset_test_database(TEST_DATABASE_URL)
+    _migrate(TEST_DATABASE_URL, "head", monkeypatch)
+    engine = create_engine(TEST_DATABASE_URL)
+    try:
+        with Session(engine) as session:
+            user = User(display_name="Teste automatico")
+            session.add(user)
+            session.commit()
+            user_id = user.id
+        settings = Settings(
+            database_url=TEST_DATABASE_URL,
+            gym_tracker_user_id=user_id,
+            openai_api_key=None,
+            parser_version="auto-pg-test",
+            gym_backup_directory=tmp_path / "backups",
+        )
+        source = tmp_path / "source.txt"
+        content = b"01/01/2026 10:00 - Pessoa: Extensora 40kg/10rep"
+        assert import_snapshot(settings, source, content).sets_accepted == 1
+        assert import_snapshot(settings, source, content).duplicate_import
+        with engine.begin() as connection:
+            connection.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": int.from_bytes(user_id.bytes[:8], "big", signed=True)},
+            )
+            with pytest.raises(SourceNotReady, match="andamento"):
+                import_snapshot(settings, source, content)
+        # Releasing the transaction lock allows the next cycle to resume.
+        assert import_snapshot(settings, source, content).duplicate_import
+        with Session(engine) as session:
+            assert session.scalar(select(func.count()).select_from(WorkoutSet)) == 1
+    finally:
+        engine.dispose()
 
 
 def _reset_test_database(database_url: str) -> None:

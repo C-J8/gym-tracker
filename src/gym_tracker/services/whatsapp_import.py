@@ -434,12 +434,16 @@ def import_whatsapp_file(
     user_id: uuid.UUID,
     settings: Settings | None = None,
     extractor: WorkoutExtractor | None = None,
+    *,
+    source_bytes: bytes | None = None,
 ) -> QualityReport:
     settings = settings or get_settings()
     if session.get(User, user_id) is None:
         raise ValueError(f"usuario nao encontrado: {user_id}")
 
-    source_bytes = file_path.read_bytes()
+    # The automatic importer supplies a stable in-memory snapshot. Do not reopen
+    # a file that may be replaced while its previous version is being processed.
+    source_bytes = file_path.read_bytes() if source_bytes is None else source_bytes
     source_hash = sha256_bytes(source_bytes)
     import_record = session.scalar(
         select(Import)
