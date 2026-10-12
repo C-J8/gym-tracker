@@ -44,6 +44,9 @@ def main():
     gym = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--planner", type=Path, default=gym.parent / "ToDoList")
+    parser.add_argument(
+        "--visual-check", action="store_true", help="pausa a fixture por ate 4 minutos para revisar /status"
+    )
     args = parser.parse_args()
     planner = args.planner.resolve()
     node = shutil.which("node")
@@ -125,6 +128,15 @@ def main():
         with urlopen(f"http://127.0.0.1:{planner_port}/api/health", timeout=10) as response:
             return response.status == 200
 
+    def status_cards():
+        with urlopen(f"http://127.0.0.1:{planner_port}/api/status", timeout=30) as response:
+            assert response.headers["Cache-Control"] == "no-store"
+            payload = json.load(response)
+        assert "Bearer" not in str(payload)
+        assert "control_port" not in str(payload)
+        assert gym_state["token"] not in str(payload)
+        return {card["id"]: card for card in payload["cards"]}
+
     runtime = fixture / ".gym-tracker"
     try:
         # A Gym startup failure returns nonzero but leaves the working Planner online.
@@ -150,8 +162,21 @@ def main():
             assert response.code == 307
             assert response.headers["Location"].rstrip("/") == f"http://127.0.0.1:{gym_port}"
         wait_until(lambda: sets_count() == 1)
+        cards = status_cards()
+        assert cards["database"]["level"] == "ok"
+        assert cards["importer"]["label"] == "Importador ativo"
+        assert cards["reviews"]["label"] == "0 pendências"
+        with urlopen(f"http://127.0.0.1:{planner_port}/status", timeout=60) as response:
+            html = response.read().decode()
+        assert "Status do sistema" in html and 'href="/status"' in html
+        if args.visual_check:
+            marker = fixture / "visual-check.done"
+            print(f"PREVIEW_URL=http://127.0.0.1:{planner_port}/status", flush=True)
+            print(f"PREVIEW_DONE_FILE={marker}", flush=True)
+            wait_until(marker.is_file, timeout=240)
         request_stop(runtime, expected_run_id=status(runtime)["run_id"])
         wait_until(lambda: not status(runtime)["running"])
+        assert status_cards()["importer"]["label"] == "Parada"
         command("status")
         command("dev", "--no-browser")
         assert status(runtime)["running"]
@@ -167,6 +192,7 @@ def main():
         command("dev", "--no-browser", env={**environment, "GYM_TRACKER_PATH": ""})
         with urlopen(f"http://127.0.0.1:{planner_port}/semana", timeout=60) as response:
             assert 'href="/academia"' not in response.read().decode()
+        assert status_cards()["gym"]["label"] == "Não configurada"
         print(
             "VERIFICADO: falhas, reuso, recuperacao, menu opcional, TXT e backup; somente dados de teste.", flush=True
         )

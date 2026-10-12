@@ -79,6 +79,41 @@ def _reset_test_database(database_url: str) -> None:
     engine.dispose()
 
 
+def test_postgres_operational_status_uses_readonly_connection(tmp_path, monkeypatch):
+    from gym_tracker import operational_status
+
+    assert TEST_DATABASE_URL is not None
+    _reset_test_database(TEST_DATABASE_URL)
+    _migrate(TEST_DATABASE_URL, "head", monkeypatch)
+    engine = create_engine(TEST_DATABASE_URL)
+    with Session(engine) as session:
+        user = User(display_name="Private fixture")
+        session.add(user)
+        session.commit()
+        user_id = user.id
+    engine.dispose()
+    settings = Settings(
+        database_url=TEST_DATABASE_URL,
+        gym_tracker_user_id=user_id,
+        openai_api_key=None,
+        gym_backup_directory=tmp_path / "backups",
+    )
+    import_snapshot(settings, tmp_path / "input.txt", b"01/01/2026 10:00 - Private fixture: Movimento X 10kg/10rep")
+    original = operational_status.create_engine
+    readers = []
+
+    def capture(*args, **kwargs):
+        reader = original(*args, **kwargs)
+        readers.append(reader)
+        return reader
+
+    monkeypatch.setattr(operational_status, "create_engine", capture)
+    assert operational_status.operational_database_status(settings) == {"database": "connected", "pending_reviews": 1}
+    with pytest.raises(Exception, match="read-only"), readers[0].begin() as connection:
+        connection.execute(text("DELETE FROM users"))
+    readers[0].dispose()
+
+
 def _migrate(database_url: str, revision: str, monkeypatch) -> None:
     monkeypatch.setenv("DATABASE_URL", database_url)
     get_settings.cache_clear()

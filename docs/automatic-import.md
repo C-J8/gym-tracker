@@ -86,6 +86,24 @@ O status consulta a trava real do importador: dashboard ativo não significa
 importação ativa. Reabrir recupera um importador parado; não tenta esconder erros
 de entrada/backup. A parada aguarda a transação do importador próprio terminar.
 
+## Status no Planner
+
+O menu Status do Planner consulta `/overview` no controle local autenticado do
+supervisor. Esse endpoint exporta somente estado do importador, horários,
+disponibilidade do banco, contagem de revisões pendentes do usuário configurado
+e data do backup automático mais recente. Não exporta nomes, conversas,
+exercícios, cargas ou indicadores de treino.
+
+A consulta usa uma conexão própria somente leitura, com limites de conexão e
+consulta; não interfere na transação do importador. A contagem do banco tem cache
+de dez segundos. Os controles de abrir/parar continuam sem consultar o banco,
+para que uma indisponibilidade não impeça o encerramento dos serviços.
+
+O arquivo de descoberta `desktop.json` não é regravado ao ficar pronto:
+o estado atual vem do controle autenticado, evitando disputa de leitura no
+Windows. Falhas do supervisor registram somente horário, classe e código do erro
+em `desktop-error.json`; o texto bruto da exceção não é registrado.
+
 ## Verificação reproduzível
 
 ```powershell

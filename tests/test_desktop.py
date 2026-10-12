@@ -2,12 +2,15 @@ import os
 import socket
 import time
 import uuid
+from urllib.error import HTTPError
+from urllib.request import urlopen
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from gym_tracker.automation import (
+    read_json,
     request_stop,
 )
 from gym_tracker.automation import (
@@ -104,6 +107,32 @@ def test_desktop_refuses_an_occupied_port(desktop_environment):
         assert control(runtime) is None
 
 
+def test_overview_is_authenticated_readonly_and_does_not_export_messages(desktop_environment):
+    runtime, port = desktop_environment
+    (runtime.parent / "source.txt").write_bytes(b"01/01/2026 10:00 - PRIVATE_NAME: PRIVATE_MOVE 10kg/10rep")
+    try:
+        start(runtime, port)
+        wait_until(lambda: importer_status(runtime).get("phase") == "imported")
+        state = read_json(runtime / "desktop.json")
+        with pytest.raises(HTTPError) as error:
+            urlopen(f"http://127.0.0.1:{state['control_port']}/overview", timeout=3)
+        assert error.value.code == 403
+        before = importer_status(runtime)["checked_at"]
+        overview = control(runtime, "overview")
+        assert overview["database"] == "connected"
+        assert overview["pending_reviews"] == 1
+        assert overview["importer"]["running"]
+        assert overview["importer"]["checked_at"] == before
+        assert overview["last_backup_at"]
+        assert "PRIVATE_NAME" not in str(overview)
+        assert "PRIVATE_MOVE" not in str(overview)
+        assert "source" not in overview["importer"]
+        assert "pid" not in overview["importer"]
+    finally:
+        control(runtime, "stop")
+        wait_until(lambda: control(runtime) is None)
+
+
 def test_reopening_recovers_stopped_importer_without_restarting_dashboard(desktop_environment):
     runtime, port = desktop_environment
     try:
@@ -162,3 +191,63 @@ def test_desktop_preserves_manual_replacement_after_its_worker_stops(desktop_env
         if manual:
             request_stop(runtime, expected_run_id=manual["run_id"])
             wait_until(lambda: not importer_status(runtime)["running"])
+
+
+def test_reopen_waits_for_supervisor_ownership_even_if_worker_already_has_lock(tmp_path, monkeypatch):
+    from gym_tracker import desktop
+
+    starting = {"port": 8501, "phase": "starting", "importer_owned": False, "importer": {"running": True}}
+    ready = {**starting, "phase": "ready", "importer_owned": True}
+    observations = iter([starting, starting, ready])
+
+    def observed(_runtime, action="status"):
+        return starting if action == "ensure" else next(observations)
+
+    monkeypatch.setattr(desktop, "control", observed)
+    monkeypatch.setattr(desktop.time, "sleep", lambda _: None)
+    assert desktop.start(tmp_path, 8501) == ready
+
+
+def test_supervisor_does_not_rewrite_discovery_descriptor_after_ready(desktop_environment, monkeypatch):
+    from gym_tracker import desktop
+
+    runtime, port = desktop_environment
+    writes = []
+    original = desktop.write_json
+
+    def once_only(path, value):
+        if path.name == "desktop.json":
+            writes.append(path)
+            if len(writes) > 1:
+                raise PermissionError("Simulated Windows read handle")
+        original(path, value)
+
+    class FinishedDashboard:
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(desktop, "write_json", once_only)
+    monkeypatch.setattr(desktop.subprocess, "Popen", lambda *_args, **_kwargs: FinishedDashboard())
+    monkeypatch.setattr(desktop, "dashboard_healthy", lambda _: True)
+    monkeypatch.setattr(desktop, "start_importer", lambda *_args, **_kwargs: {"run_id": "manual"})
+    desktop.watch(runtime, port, str(uuid.uuid4()))
+    assert len(writes) == 1
+
+
+def test_supervisor_failure_diagnostic_does_not_log_exception_text(tmp_path, monkeypatch, capsys):
+    from gym_tracker import desktop
+
+    def broken(*_args, **_kwargs):
+        raise PermissionError("SECRET credentials or message")
+
+    runtime = tmp_path / "runtime"
+    monkeypatch.setattr(desktop, "watch", broken)
+    monkeypatch.setattr(desktop.sys, "argv", ["desktop", "watch", "--runtime-dir", str(runtime)])
+    with pytest.raises(SystemExit) as error:
+        desktop.main()
+    assert error.value.code == 1
+    diagnostic = read_json(runtime / "desktop-error.json")
+    assert diagnostic["kind"] == "PermissionError"
+    assert set(diagnostic) == {"at", "kind", "errno"}
+    assert "SECRET" not in str(diagnostic)
+    assert "SECRET" not in capsys.readouterr().out

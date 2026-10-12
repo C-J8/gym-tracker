@@ -9,6 +9,8 @@ import sys
 import threading
 import time
 import uuid
+from contextlib import suppress
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import URLError
@@ -28,6 +30,7 @@ from gym_tracker.automation import (
     status as importer_status,
 )
 from gym_tracker.config import get_settings
+from gym_tracker.operational_status import last_automatic_backup, operational_database_status
 
 
 def control(runtime: Path, action: str = "status") -> dict | None:
@@ -42,7 +45,7 @@ def control(runtime: Path, action: str = "status") -> dict | None:
             headers={"Authorization": f"Bearer {token}"},
             method="POST" if action in {"stop", "ensure"} else "GET",
         )
-        with urlopen(request, timeout=3) as response:
+        with urlopen(request, timeout=10 if action == "overview" else 3) as response:
             result = json.load(response)
         if result.get("token") == token and result.get("root") == str(Path.cwd().resolve()):
             return result
@@ -62,13 +65,39 @@ def dashboard_healthy(port: int) -> bool:
 def watch(runtime: Path, port: int, token: str) -> None:
     runtime.mkdir(parents=True, exist_ok=True)
     with ProcessLock(runtime / "desktop.lock"):
-        get_settings()  # Validate configuration before starting either child.
+        settings = get_settings()  # Validate configuration before starting either child.
         root = str(Path.cwd().resolve())
         stopping = threading.Event()
         ensuring = threading.Event()
         state = {"root": root, "token": token, "port": port, "phase": "starting"}
         dashboard = None
         owned_importer = None
+        overview_lock = threading.Lock()
+        overview_cache = {}
+        overview_checked = float("-inf")
+
+        def overview():
+            nonlocal overview_cache, overview_checked
+            with overview_lock:
+                if time.monotonic() - overview_checked >= 10:
+                    overview_cache = operational_database_status(settings)
+                    overview_checked = time.monotonic()
+            importer = importer_status(runtime)
+            return {
+                **service_status(),
+                **overview_cache,
+                "importer": {
+                    key: importer.get(key)
+                    for key in (
+                        "running",
+                        "phase",
+                        "last_cycle_phase",
+                        "checked_at",
+                        "last_import_at",
+                    )
+                },
+                "last_backup_at": last_automatic_backup(settings),
+            }
 
         def service_status():
             importer = importer_status(runtime)
@@ -102,7 +131,7 @@ def watch(runtime: Path, port: int, token: str) -> None:
                     self.send_error(403)
                     return
                 if not (
-                    (self.path == "/status" and self.command == "GET")
+                    (self.path in {"/status", "/overview"} and self.command == "GET")
                     or (self.path in {"/stop", "/ensure"} and self.command == "POST")
                 ):
                     self.send_error(404)
@@ -114,7 +143,7 @@ def watch(runtime: Path, port: int, token: str) -> None:
                     if not importer_status(runtime)["running"]:
                         state["phase"] = "starting"
                         ensuring.set()
-                result = service_status()
+                result = overview() if self.path == "/overview" else service_status()
                 payload = json.dumps(result).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
@@ -164,7 +193,9 @@ def watch(runtime: Path, port: int, token: str) -> None:
                     raise RuntimeError("O dashboard nao ficou pronto. Confira .gym-tracker/dashboard.log.")
                 stopping.wait(0.25)
             ensure_importer()
-            write_json(runtime / "desktop.json", state)
+            # The discovery descriptor is immutable while this supervisor lives.
+            # Phase is served live over HTTP; rewriting here can race with a
+            # launcher's read handle on Windows and abort an otherwise ready app.
             while not stopping.wait(0.5):
                 if dashboard.poll() is not None:
                     break
@@ -204,13 +235,13 @@ def start(runtime: Path, port: int) -> dict:
     if current:
         if current["port"] != port or current["phase"] == "stopping":
             raise RuntimeError("A Academia esta encerrando ou usa outra porta. Aguarde e confira status.")
-        if current.get("importer", {}).get("running"):
+        if current["phase"] in {"ready", "degraded"} and current.get("importer", {}).get("running"):
             return current
         control(runtime, "ensure")
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
             current = control(runtime)
-            if current and current.get("importer", {}).get("running"):
+            if current and current["phase"] in {"ready", "degraded"} and current.get("importer", {}).get("running"):
                 return current
             if not current or current.get("error") or current["phase"] == "stopping":
                 break
@@ -276,6 +307,16 @@ def main():
             return
         print(json.dumps(result, ensure_ascii=False))
     except (AlreadyRunning, RuntimeError, OSError, ValueError) as error:
+        if args.command == "watch":
+            with suppress(OSError):
+                write_json(
+                    args.runtime_dir / "desktop-error.json",
+                    {
+                        "at": datetime.now(UTC).isoformat(),
+                        "kind": type(error).__name__,
+                        "errno": getattr(error, "errno", None),
+                    },
+                )
         # Only our fixed operational messages are printed; no settings/credentials.
         message = str(error) if isinstance(error, RuntimeError) else "Confira configuracao, porta e ambiente Python."
         print(json.dumps({"error": message}))
